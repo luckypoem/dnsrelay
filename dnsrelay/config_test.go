@@ -7,7 +7,7 @@ import (
 
 func TestNewConfig(t *testing.T) {
 
-	config, err := NewConfig("../dnsplay.toml")
+	config, err := NewConfig("../dnsrelay.toml")
 	if err != nil {
 		t.Fatal(err)
 	}

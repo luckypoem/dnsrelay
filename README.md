@@ -10,12 +10,14 @@ and thans to the powerful go [dns](https://github.com/miekg/dns) library.
 * [GeoLite2 Free Downloadable Databases](http://dev.maxmind.com/geoip/geoip2/geolite2/)
  
 * [geoip2-golang](https://github.com/oschwald/geoip2-golang) and [maxminddb-golang](https://github.com/oschwald/maxminddb-golang), open source Third-Party [MaxMind](http://maxmind.github.io/MaxMind-DB/) Reader for Golang
+* [dns](https://github.com/miekg/dns)
+* [toml](https://github.com/naoina/toml), [TOML config file](https://github.com/toml-lang/toml/blob/master/versions/en/toml-v0.4.0.md) parsing 
 
 ## Feature/TODO
-1. Query multiple upstream DNS servers concurrently
+1. Query multiple upstream DNS servers group concurrently
 2. Cache all mostly used domain names
 3. Load all mostly used domain names at startup
-4. DNS server group
+4. Map hostname to ip statically by configuration
 5. Domain name matching for custom DNS server
 6. GeoIP strategy for filtering untrusted DNS results from DNS server in China 
 7. Black IP list for filtering untrusted DNS results
