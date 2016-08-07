@@ -4,33 +4,33 @@ import (
 	"testing"
 	"net"
 	"fmt"
-		"math/rand"
+	"math/rand"
 
 )
 
 func TestDomainRules(t *testing.T) {
-	rules := DomainRules{Rules: *new([]Rule)}
-	rules.AddRule(Rule{Group:CN_GROUP, MatchType:MATCH_TYPE_DOMAIN_SUFFIX, Value:"baidu.com"})
-	rules.AddRule(Rule{Group:CN_GROUP, MatchType:MATCH_TYPE_DOMAIN_KEYWORD, Value:"xiaomi"})
-	rules.AddRule(Rule{Group:FG_GROUP, MatchType:MATCH_TYPE_DOMAIN, Value:"www.google.com"})
+	rule := DomainRule{Group:CN_GROUP,
+		MatchType:MATCH_TYPE_DOMAIN_SUFFIX,
+		Values:[]string{"baidu.com", "xiaomi"},
+	}
 
-	group := rules.FindGroup("baidu.com")
-	if group != CN_GROUP {
+	r := rule.Match("baidu.com")
+	if r != true {
 		t.Fail()
 	}
 
-	group = rules.FindGroup("xiaomi.com")
-	if group != CN_GROUP {
+	r = rule.Match("xiaomi.com")
+	if r != true {
 		t.Fail()
 	}
 
-	group = rules.FindGroup("www.google.com")
-	if group != FG_GROUP {
+	r = rule.Match("www.google.com")
+	if r != false {
 		t.Fail()
 	}
 
-	group = rules.FindGroup("google.com")
-	if group != "" {
+	r = rule.Match("google.com")
+	if r != false {
 		t.Fail()
 	}
 
@@ -46,8 +46,7 @@ func BenchmarkNewBlackIP(b *testing.B) {
 		ips = append(ips, ip)
 	}
 
-
-	iprule := NewBlackIP(ips)
+	iprule := NewIPBlocker(ips)
 
 	for i := 0; i < b.N; i++ {
 		ip := ips[i]
@@ -58,6 +57,5 @@ func BenchmarkNewBlackIP(b *testing.B) {
 		f = iprule.FindIP(ip)
 		fmt.Printf("Find ip %s: %v\n", ip, f)
 	}
-
 
 }

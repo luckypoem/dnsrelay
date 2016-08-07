@@ -1,0 +1,46 @@
+
+cache-num=500
+
+# use along with the CN group
+in-china=true
+
+geoip-mmdb-file="GeoLite2-Country.mmdb"
+
+# Default action is send all queries to DEFAULT groups
+default-group = ["CN","FG"]
+
+[IPFilter]
+ip=[
+    "1.1.1.1",
+   "3.3.3.3",
+   ]
+
+net=[
+    "32.32.32.0/24"
+    ]
+
+#
+# The "CN" group is special that will enable geoip filtering
+# The "REJECT" group is special that will enable domain filtering
+#
+[DNSGroup]
+CN=["192.168.0.1", "114.114.114.114"]
+FG=["8.8.8.8"]
+
+[[DomainRule]]
+# match/suffix/type
+match-type="match"
+domain-group="CN"
+value=[
+    "order.mi.com",
+    "baidu.com",
+    "asimgs.pplive.cn"
+    ]
+
+[[Host]]
+name="bb.com"
+ip=["1.1.1.1", "2.2.2.2"]
+
+[[Host]]
+name="aa.co"
+ip=["3.3.3.3", "4.4.4.4"]

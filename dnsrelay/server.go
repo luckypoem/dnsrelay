@@ -113,12 +113,22 @@ func (ds *DNSServer) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	}
 }
 
+func (self *DNSServer) FindGroup(domain string) string {
+	for _, rule := range self.config.Rules {
+		if rule.Match(domain) {
+			return rule.Group
+		}
+	}
+	return ""
+}
+
+
 func (ds *DNSServer) route(w dns.ResponseWriter, req *dns.Msg) {
 	if len(req.Question) == 0  {
 		dns.HandleFailed(w, req)
 		return
 	}
-	group := ds.config.DomainRules.FindGroup(req.Question[0].Name)
+	group := ds.FindGroup(req.Question[0].Name)
 
 	if group != "" {
 		ds.proxy(w, req, []string{group})
@@ -126,7 +136,7 @@ func (ds *DNSServer) route(w dns.ResponseWriter, req *dns.Msg) {
 		dns.HandleFailed(w, req)
 		return
 	} else {
-		ds.proxy(w, req, ds.config.DefaultGroups)
+		//ds.proxy(w, req, ds.config.DefaultGroups)
 	}
 }
 
@@ -169,7 +179,7 @@ func (ds *DNSServer) proxy(w dns.ResponseWriter, req *dns.Msg, dnsgroups []strin
 
 		result_ip := aRecord.A
 
-		if !ds.config.BlackIP.FindIP(result_ip) {
+		if !ds.config.IPBlocker.FindIP(result_ip) {
 
 			if result.group == CN_GROUP {
 				if is, err :=ds.reader.IsChineseIP(result_ip); err != nil && is{
@@ -213,7 +223,7 @@ func (ds *DNSServer) sendDNSRequestsAsync(req *dns.Msg, results chan <- DNSResul
 				// err.. is there a async func for dns.Client?
 				c := &dns.Client{Net: "udp"}
 				// 2 seconds to timeout
-				resp, _, err := c.Exchange(req, dns_ip.String())
+				resp, _, err := c.Exchange(req, dns_ip)
 				if err == nil {
 					results <- DNSResult{Response:resp, group:group}
 				} else {
