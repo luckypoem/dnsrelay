@@ -3,10 +3,20 @@ package dnsrelay
 import (
 	"net"
 	"sort"
+	"encoding/binary"
 )
 
-func IPToU32(ip net.IP) uint32 {
-	return (uint32)(ip[0]) << 24 | (uint32)(ip[1]) << 16 | (uint32)(ip[2]) << 8 | (uint32)(ip[3])
+func IPToInt(ip net.IP) uint32 {
+	// net.ParseIP will return 16 bytes for IPv4,
+	// but we cant stop user creating 4 bytes for IPv4 bytes using net.IP{N,N,N,N}
+	//
+	if len(ip) == net.IPv4len {
+		return binary.BigEndian.Uint32(ip)
+	} else if len(ip) == net.IPv6len {
+		return binary.BigEndian.Uint32(ip[12:])
+	}
+
+	return 0
 }
 
 type IPList []net.IP
@@ -18,7 +28,7 @@ func (a IPList) Swap(i, j int) {
 	a[i], a[j] = a[j], a[i]
 }
 func (a IPList) Less(i, j int) bool {
-	return IPToU32(a[i]) < IPToU32(a[j])
+	return IPToInt(a[i]) < IPToInt(a[j])
 }
 
 type IPBlocker struct {
@@ -32,7 +42,8 @@ func NewIPBlocker(ips IPList) (*IPBlocker) {
 
 func (self *IPBlocker) FindIP(ip net.IP) bool {
 	i := sort.Search(len(self.ips), func(i int) bool {
-		return IPToU32(self.ips[i]) >= IPToU32(ip)
+		// TODO: support IPv6
+		return IPToInt(self.ips[i]) >= IPToInt(ip)
 	})
 	return i < len(self.ips) && self.ips[i].Equal(ip)
 }

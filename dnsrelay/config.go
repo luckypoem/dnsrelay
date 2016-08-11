@@ -40,9 +40,6 @@ type Config struct {
 
 }
 
-type Config3 struct {
-	BlackIP IPBlocker
-}
 
 func NewConfig(path string) (c *Config, err error) {
 
