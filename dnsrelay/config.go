@@ -5,12 +5,46 @@ import (
 	"os"
 	"io/ioutil"
 	"net"
+	"strings"
+	"errors"
+	"strconv"
+	"fmt"
 )
 
 const CN_GROUP = "CN"
 const FG_GROUP = "FG"
 const REJECT_GROUP = "REJECT"
 
+type DNSAddresss struct {
+	Ip   net.IP
+	Port int
+}
+
+func (self *DNSAddresss) UnmarshalTOML(data []byte) (err error) {
+	s := strings.Trim(string(data), "\"")
+	spliter := ":"
+
+	if strings.Contains(s, spliter) {
+		arr := strings.Split(s, spliter)
+		if len(arr) != 2 {
+			return errors.New("Bad format for DNS")
+		}
+		ip, port := arr[0], arr[1]
+		self.Ip = net.ParseIP(ip)
+		self.Port, err = strconv.Atoi(port)
+		if err != nil {
+			return err
+		}
+	} else {
+		self.Ip = net.ParseIP(s)
+		self.Port = 53
+	}
+	return nil
+}
+
+func (self *DNSAddresss) String() string {
+	return fmt.Sprintf("%s:%d", self.Ip.String(), self.Port)
+}
 
 type IPFilter struct {
 	Ip  [] string
@@ -29,7 +63,7 @@ type Config struct {
 			      Net [] string
 		      }         `toml:"IPFilter"`
 
-	DNSGroups     map[string][]string `toml:"DNSGroup"`
+	DNSGroups     map[string][]DNSAddresss `toml:"DNSGroup"`
 
 	Rules         []DomainRule `toml:"DomainRule"`
 

@@ -234,24 +234,24 @@ func (ds *DNSServer) sendDNSRequestsAsync(req *dns.Msg, results chan <- DNSResul
 	var wg sync.WaitGroup
 
 	for _, group := range dnsgroups {
-		dns_ips := ds.config.DNSGroups[group]
-		wg.Add(len(dns_ips))
+		dnsL := ds.config.DNSGroups[group]
+		wg.Add(len(dnsL))
 
-		for _, dns_ip := range dns_ips {
-			go func(group, dns_ip string) {
+		for _, dnsAddr := range dnsL {
+			go func(group string, dnsAddr DNSAddresss) {
 				defer wg.Done()
 
 				// err.. is there a async func for dns.Client?
 				c := &dns.Client{Net: "udp", Timeout:10 * time.Second}
 				// 2 seconds to timeout
-				resp, _, err := c.Exchange(req, dns_ip + ":53")
+				resp, _, err := c.Exchange(req, dnsAddr.String())
 				if err == nil {
-					results <- DNSResult{Response:resp, group:group, dnsIp:net.ParseIP(dns_ip)}
+					results <- DNSResult{Response:resp, group:group, dnsIp:dnsAddr.Ip}
 				} else {
 					fmt.Println(err)
-					results <- DNSResult{err:err, group:group, dnsIp:net.ParseIP(dns_ip)}
+					results <- DNSResult{err:err, group:group, dnsIp:dnsAddr.Ip}
 				}
-			}(group, dns_ip)
+			}(group, dnsAddr)
 		}
 	}
 
