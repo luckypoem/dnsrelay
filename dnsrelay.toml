@@ -3,6 +3,7 @@ cache-num=500
 
 # use along with the CN group
 in-china=true
+#log-file="dnsrelay.log"
 
 geoip-mmdb-file="GeoLite2-Country.mmdb"
 

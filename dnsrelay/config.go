@@ -11,6 +11,7 @@ const CN_GROUP = "CN"
 const FG_GROUP = "FG"
 const REJECT_GROUP = "REJECT"
 
+
 type IPFilter struct {
 	Ip  [] string
 	Net [] string
@@ -21,6 +22,7 @@ type Config struct {
 	CacheNum      uint        `toml:"cache-num"`
 	IsInChina     bool        `toml:"in-china"`
 	DefaultGroups []string `toml:"default-group"`
+	LogFile       string `toml:"log-file"`
 
 	IPFilter      struct {
 			      Ip  [] string
@@ -36,10 +38,10 @@ type Config struct {
 		Ip   string
 	}       `toml:"Host"`
 
+	// these fields are not fields from config file
 	IPBlocker     *IPBlocker
-
+	Logger        *Logger
 }
-
 
 func NewConfig(path string) (c *Config, err error) {
 
@@ -64,6 +66,11 @@ func NewConfig(path string) (c *Config, err error) {
 	}
 
 	config.IPBlocker = NewIPBlocker(ips)
+
+	config.Logger, err = NewLogger(config.LogFile, "dnsrelay")
+	if err != nil {
+		return
+	}
 
 	return &config, nil
 

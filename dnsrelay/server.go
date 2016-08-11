@@ -3,7 +3,6 @@ package dnsrelay
 import (
 	"net"
 	"sync"
-
 	"github.com/miekg/dns"
 	"fmt"
 	"time"
@@ -15,6 +14,7 @@ type DNSServer struct {
 
 	config   *Config
 	reader   *Reader
+	logger   *Logger
 }
 
 // Create a new DNS server. Domain is an unqualified domain that will be used
@@ -29,7 +29,8 @@ func NewDNSServer(config *Config) (*DNSServer, error) {
 		aRecords:   map[string]net.IP{},
 		aMutex:     sync.RWMutex{},
 		config:     config,
-		reader: reader,
+		reader:     reader,
+		logger:     config.Logger,
 	}
 
 	ds.SetupHosts(config)
@@ -41,7 +42,7 @@ func NewDNSServer(config *Config) (*DNSServer, error) {
 // 127.0.0.1:53. This function blocks and only returns when the DNS service is
 // no longer functioning.
 func (ds *DNSServer) Listen(listenSpec string) error {
-	fmt.Println("listening...")
+	ds.logger.Infof("Listen on %s ...", listenSpec)
 	return dns.ListenAndServe(listenSpec, "udp", ds)
 }
 
@@ -172,30 +173,30 @@ func (ds *DNSServer) proxy(w dns.ResponseWriter, req *dns.Msg, dnsgroups []strin
 
 	for result := range results {
 		if result.err != nil {
-			fmt.Printf("Error from group[%s] DNS[%s]: ===>\n %v \n<===\n", result.group, result.dnsIp, result.err)
+			ds.logger.Debugf("Error from group(%s) DNS(%s): ===>\n %v \n<===\n", result.group, result.dnsIp.String(), result.err)
 			continue
 		} else {
-			fmt.Printf("Result from group[%s] DNS[%s]: ===>\n %v \n<===\n", result.group, result.dnsIp, result.Response)
+			ds.logger.Debugf("Result from group(%s) DNS(%s): ===>\n %v \n<===\n", result.group, result.dnsIp.String(), result.Response)
 
 		}
 
 		aRecord, ok := result.Response.Answer[0].(*dns.A)
 		if !ok {
-			fmt.Printf("Not a A record return %v", aRecord)
+			ds.logger.Infof("Not a A record return %v", aRecord)
 			continue
 		}
 
 		resultIp := aRecord.A
 
 		if ds.config.IPBlocker.FindIP(resultIp) {
-			fmt.Printf("block ip %v", resultIp.String())
+			ds.logger.Infof("block ip %v", resultIp.String())
 			continue
 		}
 
 		isCN, err := ds.reader.IsChineseIP(resultIp)
 
 		if err != nil {
-			fmt.Errorf("cant reconize the localtion of ip:%s", resultIp.String())
+			ds.logger.Errorf("cant reconize the localtion of ip:%s", resultIp.String())
 			if result.group != CN_GROUP {
 				response = result.Response
 				break
@@ -211,7 +212,6 @@ func (ds *DNSServer) proxy(w dns.ResponseWriter, req *dns.Msg, dnsgroups []strin
 			response = result.Response
 			break
 		}
-
 	}
 
 	if response == nil {
