@@ -1,7 +1,7 @@
 //
 // Modified from https://github.com/oschwald/geoip2-golang/reader.go
 //
-// why not use geoip2-golang ?
+// why not use geoip2-golang directly?
 // 	If you only need several fields, you may get superior performance by using maxminddb's
 // 	Lookup directly with a result struct that only contains the required fields.
 // 	(See example_test.go in the https://github.com/oschwald/maxminddb-golang repository for an example of this.)

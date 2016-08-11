@@ -24,7 +24,7 @@ net=[
 # The "REJECT" group is special that will enable domain filtering
 #
 [DNSGroup]
-CN=["192.168.0.1", "114.114.114.114"]
+CN=["192.168.1.1"]
 FG=["8.8.8.8"]
 
 [[DomainRule]]
@@ -39,8 +39,8 @@ value=[
 
 [[Host]]
 name="bb.com"
-ip=["1.1.1.1", "2.2.2.2"]
+ip="1.1.1.1"
 
 [[Host]]
 name="aa.co"
-ip=["3.3.3.3", "4.4.4.4"]
+ip="3.3.3.3"

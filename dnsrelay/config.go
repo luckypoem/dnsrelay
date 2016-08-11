@@ -33,7 +33,7 @@ type Config struct {
 
 	Hosts         [] struct {
 		Name string
-		Ip   []string
+		Ip   string
 	}       `toml:"Host"`
 
 	IPBlocker     *IPBlocker

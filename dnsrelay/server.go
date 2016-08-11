@@ -6,51 +6,55 @@ import (
 
 	"github.com/miekg/dns"
 	"fmt"
+	"time"
 )
 
 type DNSServer struct {
-	aRecords map[string]net.IP // FQDN -> IP
-	aMutex   sync.RWMutex      // mutex for A record operations
+	aRecords map[string]net.IP
+	aMutex   sync.RWMutex // mutex for A record operations
 
-	config   Config
+	config   *Config
 	reader   *Reader
 }
 
 // Create a new DNS server. Domain is an unqualified domain that will be used
 // as the TLD.
-func NewDNSServer(config Config) (*DNSServer, error) {
+func NewDNSServer(config *Config) (*DNSServer, error) {
 	reader, err := Open(config.GeoIPDBPath)
 	if err != nil {
 		return nil, err
 	}
 
-	return &DNSServer{
+	ds := DNSServer{
 		aRecords:   map[string]net.IP{},
 		aMutex:     sync.RWMutex{},
 		config:     config,
 		reader: reader,
-	}, nil
+	}
+
+	ds.SetupHosts(config)
+
+	return &ds, nil
 }
 
 // Listen for DNS requests. listenSpec is a dotted-quad + port, e.g.,
 // 127.0.0.1:53. This function blocks and only returns when the DNS service is
 // no longer functioning.
 func (ds *DNSServer) Listen(listenSpec string) error {
+	fmt.Println("listening...")
 	return dns.ListenAndServe(listenSpec, "udp", ds)
 }
 
-
-
-// Receives a FQDN; looks up and supplies the A record.
-func (ds *DNSServer) GetA(fqdn string) *dns.A {
+// looks up and supplies the A record.
+func (ds *DNSServer) GetA(domain string) *dns.A {
 	ds.aMutex.RLock()
 	defer ds.aMutex.RUnlock()
-	val, ok := ds.aRecords[fqdn]
+	val, ok := ds.aRecords[domain]
 
 	if ok {
 		return &dns.A{
 			Hdr: dns.RR_Header{
-				Name:   fqdn,
+				Name:   domain,
 				Rrtype: dns.TypeA,
 				Class:  dns.ClassINET,
 				// 0 TTL results in UB for DNS resolvers and generally causes problems.
@@ -81,13 +85,21 @@ func (ds *DNSServer) CleanCache() {
 	ds.aRecords = map[string]net.IP{}
 }
 
+func (ds *DNSServer) SetupHosts(config *Config) {
+	for _, host := range config.Hosts {
+		ds.SetA(host.Name, net.ParseIP(host.Ip))
+	}
+}
+
 // Main callback for miekg/dns. Collects information about the query,
 // constructs a response, and returns it to the connector.
 func (ds *DNSServer) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
+
 	m := &dns.Msg{}
 	m.SetReply(req)
 
 	answers := []dns.RR{}
+
 
 	// check if cache already have the answers
 	for _, question := range req.Question {
@@ -101,7 +113,6 @@ func (ds *DNSServer) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		}
 	}
 
-
 	if len(answers) > 0 {
 		// Without these the glibc resolver gets very angry.
 		m.Authoritative = true
@@ -113,7 +124,7 @@ func (ds *DNSServer) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	}
 }
 
-func (self *DNSServer) FindGroup(domain string) string {
+func (self *DNSServer) findGroup(domain string) string {
 	for _, rule := range self.config.Rules {
 		if rule.Match(domain) {
 			return rule.Group
@@ -122,13 +133,12 @@ func (self *DNSServer) FindGroup(domain string) string {
 	return ""
 }
 
-
 func (ds *DNSServer) route(w dns.ResponseWriter, req *dns.Msg) {
-	if len(req.Question) == 0  {
+	if len(req.Question) == 0 {
 		dns.HandleFailed(w, req)
 		return
 	}
-	group := ds.FindGroup(req.Question[0].Name)
+	group := ds.findGroup(req.Question[0].Name)
 
 	if group != "" {
 		ds.proxy(w, req, []string{group})
@@ -136,39 +146,37 @@ func (ds *DNSServer) route(w dns.ResponseWriter, req *dns.Msg) {
 		dns.HandleFailed(w, req)
 		return
 	} else {
-		//ds.proxy(w, req, ds.config.DefaultGroups)
+		ds.proxy(w, req, ds.config.DefaultGroups)
 	}
 }
-
 
 type DNSResult struct {
 	Response *dns.Msg
 	group    string
+	dnsIp    net.IP
 	err      error
 }
 
 func (ds *DNSServer) proxy(w dns.ResponseWriter, req *dns.Msg, dnsgroups []string) {
 
-	counter := 0
-
+	chanLen := 0
 	for _, group := range dnsgroups {
-		counter += len(ds.config.DNSGroups[group])
+		chanLen += len(ds.config.DNSGroups[group])
 	}
 
-	results := make(chan DNSResult, counter)
+	// the chan is big enough to hold all results
+	results := make(chan DNSResult, chanLen)
 	ds.sendDNSRequestsAsync(req, results, dnsgroups)
 
 	var response *dns.Msg
 
 	for result := range results {
-
-		counter -= 1
-		if counter == 0 {
-			break
-		}
-
 		if result.err != nil {
+			fmt.Printf("Error from group[%s] DNS[%s]: ===>\n %v \n<===\n", result.group, result.dnsIp, result.err)
 			continue
+		} else {
+			fmt.Printf("Result from group[%s] DNS[%s]: ===>\n %v \n<===\n", result.group, result.dnsIp, result.Response)
+
 		}
 
 		aRecord, ok := result.Response.Answer[0].(*dns.A)
@@ -177,26 +185,34 @@ func (ds *DNSServer) proxy(w dns.ResponseWriter, req *dns.Msg, dnsgroups []strin
 			continue
 		}
 
-		result_ip := aRecord.A
+		resultIp := aRecord.A
 
-		if !ds.config.IPBlocker.FindIP(result_ip) {
+		if ds.config.IPBlocker.FindIP(resultIp) {
+			fmt.Printf("block ip %v", resultIp.String())
+			continue
+		}
 
-			if result.group == CN_GROUP {
-				if is, err :=ds.reader.IsChineseIP(result_ip); err != nil && is{
-					response = result.Response
-					break
-				}
+		isCN, err := ds.reader.IsChineseIP(resultIp)
+
+		if err != nil {
+			fmt.Errorf("cant reconize the localtion of ip:%s", resultIp.String())
+			if result.group != CN_GROUP {
+				response = result.Response
+				break
 			} else {
-				if is, err :=ds.reader.IsChineseIP(result_ip); err != nil && !is {
-					response = result.Response
-					break
-				}
+				continue
 			}
 		}
 
-	}
+		if result.group == CN_GROUP  && isCN {
+			response = result.Response
+			break
+		} else if result.group != CN_GROUP  && !isCN {
+			response = result.Response
+			break
+		}
 
-	close(results)
+	}
 
 	if response == nil {
 		dns.HandleFailed(w, req)
@@ -215,24 +231,33 @@ func (ds *DNSServer) proxy(w dns.ResponseWriter, req *dns.Msg, dnsgroups []strin
 }
 
 func (ds *DNSServer) sendDNSRequestsAsync(req *dns.Msg, results chan <- DNSResult, dnsgroups []string) {
+	var wg sync.WaitGroup
 
 	for _, group := range dnsgroups {
 		dns_ips := ds.config.DNSGroups[group]
-		for _, dns_ip := range dns_ips {
-			go func() {
-				// err.. is there a async func for dns.Client?
-				c := &dns.Client{Net: "udp"}
-				// 2 seconds to timeout
-				resp, _, err := c.Exchange(req, dns_ip)
-				if err == nil {
-					results <- DNSResult{Response:resp, group:group}
-				} else {
-					results <- DNSResult{err:err}
-				}
+		wg.Add(len(dns_ips))
 
-				return
-			}()
+		for _, dns_ip := range dns_ips {
+			go func(group, dns_ip string) {
+				defer wg.Done()
+
+				// err.. is there a async func for dns.Client?
+				c := &dns.Client{Net: "udp", Timeout:10 * time.Second}
+				// 2 seconds to timeout
+				resp, _, err := c.Exchange(req, dns_ip + ":53")
+				if err == nil {
+					results <- DNSResult{Response:resp, group:group, dnsIp:net.ParseIP(dns_ip)}
+				} else {
+					fmt.Println(err)
+					results <- DNSResult{err:err, group:group, dnsIp:net.ParseIP(dns_ip)}
+				}
+			}(group, dns_ip)
 		}
 	}
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
 
 }
