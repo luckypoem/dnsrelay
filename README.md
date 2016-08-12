@@ -23,14 +23,75 @@ Thans to [godns](https://github.com/kenshinx/godns),[grimd](https://github.com/l
 ## TODO
 1. Load all mostly used domain names at startup
 2. Cache optimization
+3. Supporting Ip filtering by subnet config
+
+## Notice
+If DNS protocol are poisoning and filtering like in  China, DNS server like 8.8.8.8 may not response, so VPN(and system routing tables entry for 8.8.8.8, e.g.) is required to get dnsrelay work.
 
 
 ## Configuration
 
 The configuration dnsrelay.toml is a [TOML](https://github.com/mojombo/toml) format config file.
 
-## Notice
-If DNS protocol are poisoning and filtering like in  China, DNS server like 8.8.8.8 may not response, so VPN(and system routing tables entry for 8.8.8.8, e.g.) is required to get dnsrelay work.
+* DNS group
+
+You can define multiple groups, default groups is used to send all DNS request that no rules match.
+
+```
+default-group = ["CN","FG"]
+
+[DNSGroup]
+CN=["192.168.1.1", "114.114.114.114", "223.6.6.6:53", "223.5.5.5"]
+FG=["8.8.8.8", "8.8.4.4"]
+```
+
+* DNS matching Rules
+
+For example, if there is a DNS request asking A record for “baidu.com”, the rule bellow matched, the DNS group specified by ‘domain-group’ is CN. Then the the DNS request is send to all DNS defined by CN group
+
+```
+[[DomainRule]]
+match-type="MATCH"
+domain-group="CN"
+value=[
+    "order.mi.com",
+    "baidu.com",
+    ]
+```
+
+ * Hosts
+
+Like /etc/hosts, you can set one or more ip for a domain without sending any DNS requests:
+
+```
+[[Host]]
+name="example.com"
+ip=["93.184.216.34"]
+
+[[Host]]
+name="ip.com"
+ip=["64.111.96.203"]
+```
+
+* Ip filtering
+
+DNS result may points to the wrong Ip in China because of DNS poisoning power by GFW(?), so ip filtering is needed:
+
+```
+[IPFilter]
+ip=[
+   "64.111.96.204"
+   ]
+```
+
+* Cache DNS results
+
+```
+[Cache]
+backend = "memory"
+expire = 3600 
+maxcount = 500
+```
 
 
 ## LICENSE

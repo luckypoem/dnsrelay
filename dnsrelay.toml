@@ -11,7 +11,7 @@ default-group = ["CN","FG"]
 
 [Cache]
 backend = "memory"
-expire = 3600  # default expire time 10 minutes
+expire = 3600
 maxcount = 500
 
 [IPFilter]
@@ -50,8 +50,8 @@ value=["umeng.com"]
 
 [[Host]]
 name="example.com"
-ip=["1.1.1.1"]
+ip=["93.184.216.34"]
 
 [[Host]]
-name="aa.co"
-ip=["3.3.3.3"]
+name="ip.com"
+ip=["64.111.96.203"]
