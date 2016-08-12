@@ -8,18 +8,22 @@ Thans to [godns](https://github.com/kenshinx/godns),[grimd](https://github.com/l
 
 * [GeoLite2 Free Downloadable Databases](http://dev.maxmind.com/geoip/geoip2/geolite2/)
 * [geoip2-golang](https://github.com/oschwald/geoip2-golang) and [maxminddb-golang](https://github.com/oschwald/maxminddb-golang), open source Third-Party [MaxMind](http://maxmind.github.io/MaxMind-DB/) Reader for Golang
-* [dns](https://github.com/miekg/dns)
+* [go dns](https://github.com/miekg/dns)
 * [toml](https://github.com/naoina/toml), [TOML config file](https://github.com/toml-lang/toml/blob/master/versions/en/toml-v0.4.0.md) parsing 
 * [go-logger](https://github.com/apsdehal/go-logger)
 
-## Feature/TODO
-1. Query multiple upstream DNS servers group concurrently
+## Feature
+1. Query multiple upstream DNS group concurrently
 2. Cache all mostly used domain names
-3. Load all mostly used domain names at startup
-4. Map hostname to ip statically by configuration
-5. Domain name matching for custom DNS server
-6. GeoIP strategy for filtering untrusted DNS results from DNS server in China 
-7. Black IP list for filtering untrusted DNS results
+3. Hosts configuration
+4. Domain name matching for custom DNS server
+5. GeoIP strategy for filtering untrusted DNS results from DNS server of China 
+6. Black IP list for filtering untrusted DNS results
+
+## TODO
+1. Load all mostly used domain names at startup
+2. Cache optimization
+
 
 ## Configuration
 

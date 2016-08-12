@@ -11,7 +11,7 @@ default-group = ["CN","FG"]
 
 [Cache]
 backend = "memory"
-expire = 600  # default expire time 10 minutes
+expire = 3600  # default expire time 10 minutes
 maxcount = 500
 
 [IPFilter]
