@@ -4,17 +4,15 @@ import (
 	"net"
 	"sync"
 	"github.com/miekg/dns"
-	"fmt"
 	"time"
+	"errors"
 )
 
 type DNSServer struct {
-	aRecords map[string]net.IP
-	aMutex   sync.RWMutex // mutex for A record operations
-
-	config   *Config
-	reader   *Reader
-	logger   *Logger
+	config    *Config
+	geoReader *Reader
+	logger    *Logger
+	cache     *MemoryCache
 }
 
 // Create a new DNS server. Domain is an unqualified domain that will be used
@@ -25,15 +23,24 @@ func NewDNSServer(config *Config) (*DNSServer, error) {
 		return nil, err
 	}
 
-	ds := DNSServer{
-		aRecords:   map[string]net.IP{},
-		aMutex:     sync.RWMutex{},
-		config:     config,
-		reader:     reader,
-		logger:     config.Logger,
+	var cache MemoryCache
+	switch config.DNSCache.Backend {
+	case "memory":
+		cache = MemoryCache{
+			Backend:  make(map[string]Mesg, config.DNSCache.Maxcount),
+			Expire:   time.Duration(config.DNSCache.Expire) * time.Second,
+			Maxcount: config.DNSCache.Maxcount,
+		}
+	default:
+		return nil, errors.New("Cache backend dont support!")
 	}
 
-	ds.SetupHosts(config)
+	ds := DNSServer{
+		config:     config,
+		geoReader:  reader,
+		logger:     config.Logger,
+		cache:      &cache,
+	}
 
 	return &ds, nil
 }
@@ -46,119 +53,79 @@ func (ds *DNSServer) Listen(listenSpec string) error {
 	return dns.ListenAndServe(listenSpec, "udp", ds)
 }
 
-// looks up and supplies the A record.
-func (ds *DNSServer) GetA(domain string) *dns.A {
-	ds.aMutex.RLock()
-	defer ds.aMutex.RUnlock()
-	val, ok := ds.aRecords[domain]
-
-	if ok {
-		return &dns.A{
-			Hdr: dns.RR_Header{
-				Name:   domain,
-				Rrtype: dns.TypeA,
-				Class:  dns.ClassINET,
-				// 0 TTL results in UB for DNS resolvers and generally causes problems.
-				Ttl: 1,
-			},
-			A: val,
-		}
-	}
-
-	return nil
-}
-
-// Sets a host to an IP. Note that this is not the FQDN, but a hostname.
-func (ds *DNSServer) SetA(host string, ip net.IP) {
-	ds.aMutex.Lock()
-	ds.aRecords[host] = ip
-	ds.aMutex.Unlock()
-}
-
-// Deletes a host. Note that this is not the FQDN, but a hostname.
-func (ds *DNSServer) DeleteA(host string) {
-	ds.aMutex.Lock()
-	delete(ds.aRecords, host)
-	ds.aMutex.Unlock()
-}
-
-func (ds *DNSServer) CleanCache() {
-	ds.aRecords = map[string]net.IP{}
-}
-
-func (ds *DNSServer) SetupHosts(config *Config) {
-	for _, host := range config.Hosts {
-		ds.SetA(host.Name, net.ParseIP(host.Ip))
-	}
-}
 
 // Main callback for miekg/dns. Collects information about the query,
 // constructs a response, and returns it to the connector.
 func (ds *DNSServer) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 
-	m := &dns.Msg{}
-	m.SetReply(req)
-
-	answers := []dns.RR{}
-
-
-	// check if cache already have the answers
-	for _, question := range req.Question {
-		// nil records == not found
-		switch question.Qtype {
-		case dns.TypeA:
-			a := ds.GetA(question.Name)
-			if a != nil {
-				answers = append(answers, a)
-			}
-		}
-	}
-
-	if len(answers) > 0 {
-		// Without these the glibc resolver gets very angry.
-		m.Authoritative = true
-		m.RecursionAvailable = true
-		m.Answer = answers
-		w.WriteMsg(m)
-	} else {
-		ds.route(w, req)
-	}
-}
-
-func (self *DNSServer) findGroup(domain string) string {
-	for _, rule := range self.config.Rules {
-		if rule.Match(domain) {
-			return rule.Group
-		}
-	}
-	return ""
-}
-
-func (ds *DNSServer) route(w dns.ResponseWriter, req *dns.Msg) {
 	if len(req.Question) == 0 {
 		dns.HandleFailed(w, req)
 		return
 	}
-	group := ds.findGroup(req.Question[0].Name)
 
-	if group != "" {
-		ds.proxy(w, req, []string{group})
-	} else if group == REJECT_GROUP {
-		dns.HandleFailed(w, req)
-		return
+	var resp *dns.Msg
+	hitCache := false
+
+	question := req.Question[0]
+	if question.Qclass == dns.ClassINET &&
+		(question.Qtype == dns.TypeA || question.Qtype == dns.TypeAAAA) {
+
+		if cacheResp, err := ds.cache.Get(question.Name); err == nil {
+			ds.logger.Debugf("%s hit cache", question.Name)
+			// dont change cache object, copy it
+			newResp := *cacheResp
+			newResp.Id = req.Id
+			resp = &newResp
+			hitCache = true
+		} else if newResp, ok := ds.config.Hosts.Get(req); ok {
+			ds.logger.Debugf("%s found in hosts file", question.Name)
+			resp = newResp
+		}
+	}
+
+	if resp == nil {
+		group := ds.config.DomainRules.findGroup(UnFqdn(question.Name))
+		if group == REJECT_GROUP {
+			ds.logger.Debugf("Reject %s!", question.Name)
+			resp = nil
+		} else if group != "" {
+			resp = ds.sendRequest(req, []string{group})
+		} else {
+			resp = ds.sendRequest(req, ds.config.DefaultGroups)
+		}
+	}
+
+	if resp != nil {
+		w.WriteMsg(resp)
+
+		if question.Qclass == dns.ClassINET &&
+			(question.Qtype == dns.TypeA || question.Qtype == dns.TypeAAAA) &&
+			len(resp.Answer) > 0 {
+
+			if hitCache == true {
+				ds.logger.Debugf("No need to insert %s into cache", question.Name)
+
+			} else if err := ds.cache.Set(question.Name, resp); err != nil {
+				ds.logger.Warningf("Set %s cache failed: %s", question.Name, err.Error())
+			} else {
+				ds.logger.Debugf("Insert %s into cache", question.Name)
+			}
+		}
 	} else {
-		ds.proxy(w, req, ds.config.DefaultGroups)
+		dns.HandleFailed(w, req)
 	}
 }
 
 type DNSResult struct {
+	Group    string
+	DnsIp    net.IP
+
 	Response *dns.Msg
-	group    string
-	dnsIp    net.IP
-	err      error
+	Rtt      time.Duration
+	Err      error
 }
 
-func (ds *DNSServer) proxy(w dns.ResponseWriter, req *dns.Msg, dnsgroups []string) {
+func (ds *DNSServer) sendRequest(req *dns.Msg, dnsgroups []string) (resp *dns.Msg) {
 
 	chanLen := 0
 	for _, group := range dnsgroups {
@@ -169,65 +136,67 @@ func (ds *DNSServer) proxy(w dns.ResponseWriter, req *dns.Msg, dnsgroups []strin
 	results := make(chan DNSResult, chanLen)
 	ds.sendDNSRequestsAsync(req, results, dnsgroups)
 
-	var response *dns.Msg
-
+	waitingDNSResponse:
 	for result := range results {
-		if result.err != nil {
-			ds.logger.Debugf("Error from group(%s) DNS(%s): ===>\n %v \n<===\n", result.group, result.dnsIp.String(), result.err)
+		if result.Err != nil {
+			ds.logger.Debugf("Error from group(%s) DNS(%s): ===>\n %v \n<===\n", result.Group, result.DnsIp.String(), result.Err)
 			continue
 		} else {
-			ds.logger.Debugf("Result from group(%s) DNS(%s): ===>\n %v \n<===\n", result.group, result.dnsIp.String(), result.Response)
-
+			ds.logger.Debugf("Result from group(%s) DNS(%s): ===>\n %v \n<===\n", result.Group, result.DnsIp.String(), result.Response)
 		}
 
-		aRecord, ok := result.Response.Answer[0].(*dns.A)
-		if !ok {
-			ds.logger.Infof("Not a A record return %v", aRecord)
+		if len(result.Response.Answer) < 1 {
+			ds.logger.Debugf("0 answer response from  %s", result.DnsIp.String())
 			continue
 		}
 
-		resultIp := aRecord.A
+		switch result.Response.Answer[0].(type) {
+		case *dns.A:
+			aRecord, _ := result.Response.Answer[0].(*dns.A)
+			resultIp := aRecord.A
 
-		if ds.config.IPBlocker.FindIP(resultIp) {
-			ds.logger.Infof("block ip %v", resultIp.String())
-			continue
-		}
-
-		isCN, err := ds.reader.IsChineseIP(resultIp)
-
-		if err != nil {
-			ds.logger.Errorf("cant reconize the localtion of ip:%s", resultIp.String())
-			if result.group != CN_GROUP {
-				response = result.Response
-				break
-			} else {
-				continue
+			if ds.isIpOK(result.Group, resultIp) {
+				resp = result.Response
+				break waitingDNSResponse
 			}
-		}
-
-		if result.group == CN_GROUP  && isCN {
-			response = result.Response
-			break
-		} else if result.group != CN_GROUP  && !isCN {
-			response = result.Response
-			break
+		default:
+			resp = result.Response
+			break waitingDNSResponse
 		}
 	}
 
-	if response == nil {
-		dns.HandleFailed(w, req)
-		// If we have no answers, that means we found nothing or didn't get a query
-		// we can reply to. Reply with no answers so we ensure the query moves on to
-		// the next server.
-		//if len(answers) == 0 {
-		//	m.SetRcode(r, dns.RcodeSuccess)
-		//	w.WriteMsg(m)
-		//	return
-		//}
+	ds.logger.Debugf("response for request:%v\n", resp)
+	return resp
+}
 
-	} else {
-		w.WriteMsg(response)
+func (ds *DNSServer) isIpOK(dnsGroup string, resultIp net.IP) bool {
+	if ds.config.IPFilter.FindIP(resultIp) {
+		ds.logger.Infof("block ip %v", resultIp.String())
+		return false
 	}
+
+	if ds.config.FuckGFW == false {
+		return true
+	}
+
+	isCN, err := ds.geoReader.IsChineseIP(resultIp)
+
+	if err != nil {
+		ds.logger.Errorf("cant reconize the localtion of ip:%s", resultIp.String())
+		if dnsGroup != CN_GROUP {
+			return true
+		} else {
+			return false
+		}
+	}
+
+	if dnsGroup == CN_GROUP  && isCN {
+		return true
+	} else if dnsGroup != CN_GROUP  && !isCN {
+		return true
+	}
+
+	return false
 }
 
 func (ds *DNSServer) sendDNSRequestsAsync(req *dns.Msg, results chan <- DNSResult, dnsgroups []string) {
@@ -244,13 +213,9 @@ func (ds *DNSServer) sendDNSRequestsAsync(req *dns.Msg, results chan <- DNSResul
 				// err.. is there a async func for dns.Client?
 				c := &dns.Client{Net: "udp", Timeout:10 * time.Second}
 				// 2 seconds to timeout
-				resp, _, err := c.Exchange(req, dnsAddr.String())
-				if err == nil {
-					results <- DNSResult{Response:resp, group:group, dnsIp:dnsAddr.Ip}
-				} else {
-					fmt.Println(err)
-					results <- DNSResult{err:err, group:group, dnsIp:dnsAddr.Ip}
-				}
+				resp, rtt, err := c.Exchange(req, dnsAddr.String())
+				results <- DNSResult{Response:resp, Rtt: rtt, Err: err, Group:group, DnsIp:dnsAddr.Ip}
+
 			}(group, dnsAddr)
 		}
 	}

@@ -5,10 +5,25 @@ import (
 )
 
 const (
-	MATCH_TYPE_DOMAIN_SUFFIX = "suffix"
-	MATCH_TYPE_DOMAIN_MATCH = "match"
-	MATCH_TYPE_DOMAIN_KEYWORD = "keywork"
+	CN_GROUP = "CN"
+	FG_GROUP = "FG"
+	REJECT_GROUP = "REJECT"
+
+	MATCH_TYPE_DOMAIN_SUFFIX = "SUFFIX"
+	MATCH_TYPE_DOMAIN_MATCH = "MATCH"
+	MATCH_TYPE_DOMAIN_KEYWORD = "KEYWORD"
 )
+
+type DomainRules []DomainRule
+
+func (self DomainRules) findGroup(domain string) string {
+	for _, rule := range self {
+		if rule.Match(domain) {
+			return rule.Group
+		}
+	}
+	return ""
+}
 
 type DomainRule struct {
 	MatchType string `toml:"match-type"`

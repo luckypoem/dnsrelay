@@ -13,5 +13,6 @@ func TestNewConfig(t *testing.T) {
 	}
 
 	fmt.Println(config)
+	fmt.Println(config.DomainRules)
 
 }

@@ -11,7 +11,7 @@ import (
 func TestDomainRules(t *testing.T) {
 	rule := DomainRule{Group:CN_GROUP,
 		MatchType:MATCH_TYPE_DOMAIN_SUFFIX,
-		Values:[]string{"baidu.com", "xiaomi"},
+		Values:[]string{"baidu.com", "xiaomi.com"},
 	}
 
 	r := rule.Match("baidu.com")
@@ -32,6 +32,13 @@ func TestDomainRules(t *testing.T) {
 	r = rule.Match("google.com")
 	if r != false {
 		t.Fail()
+	}
+
+	rules := DomainRules{rule}
+
+	g := rules.findGroup("baidu.com")
+	if g != CN_GROUP {
+		t.Fatal("rules match fail!")
 	}
 
 }
