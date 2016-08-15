@@ -17,7 +17,7 @@ type DNSServer struct {
 
 // Create a new DNS server. Domain is an unqualified domain that will be used
 // as the TLD.
-func NewDNSServer(config *Config) (*DNSServer, error) {
+func NewDNSServer(config *Config) (ds *DNSServer, err error) {
 	reader, err := Open(config.GeoIPDBPath)
 	if err != nil {
 		return nil, err
@@ -35,14 +35,19 @@ func NewDNSServer(config *Config) (*DNSServer, error) {
 		return nil, errors.New("Cache backend dont support!")
 	}
 
-	ds := DNSServer{
+	logger, err := NewLogger(config.LogConfig.LogFile, "dnsrelay", config.LogConfig.LogLevel)
+	if err != nil {
+		return
+	}
+
+	ds = &DNSServer{
 		config:     config,
 		geoReader:  reader,
-		logger:     config.Logger,
+		logger:     logger,
 		cache:      &cache,
 	}
 
-	return &ds, nil
+	return
 }
 
 // Listen for DNS requests. listenSpec is a dotted-quad + port, e.g.,
@@ -136,13 +141,13 @@ func (ds *DNSServer) sendRequest(req *dns.Msg, dnsgroups []string) (resp *dns.Ms
 	results := make(chan DNSResult, chanLen)
 	ds.sendDNSRequestsAsync(req, results, dnsgroups)
 
-	waitingDNSResponse:
+	WaitingDNSResponse:
 	for result := range results {
 		if result.Err != nil {
-			ds.logger.Debugf("Error from group(%s) DNS(%s): ===>\n %v \n<===\n", result.Group, result.DnsIp.String(), result.Err)
+			ds.logger.Errorf("Error from group[%s] DNS[%s]: ===>\n %v \n<===\n", result.Group, result.DnsIp.String(), result.Err)
 			continue
 		} else {
-			ds.logger.Debugf("Result from group(%s) DNS(%s): ===>\n %v \n<===\n", result.Group, result.DnsIp.String(), result.Response)
+			ds.logger.Debugf("Result from group[%s] DNS[%s]: ===>\n %v \n<===\n", result.Group, result.DnsIp.String(), result.Response)
 		}
 
 		if len(result.Response.Answer) < 1 {
@@ -157,11 +162,11 @@ func (ds *DNSServer) sendRequest(req *dns.Msg, dnsgroups []string) (resp *dns.Ms
 
 			if ds.isIpOK(result.Group, resultIp) {
 				resp = result.Response
-				break waitingDNSResponse
+				break WaitingDNSResponse
 			}
 		default:
 			resp = result.Response
-			break waitingDNSResponse
+			break WaitingDNSResponse
 		}
 	}
 

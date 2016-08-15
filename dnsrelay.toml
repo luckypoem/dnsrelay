@@ -2,12 +2,15 @@
 # use along with the CN group
 fuck-gfw=true
 
-#log-file="dnsrelay.log"
 
 geoip-mmdb-file="GeoLite2-Country.mmdb"
 
 # Default action is send all queries to DEFAULT groups
 default-group = ["CN","FG"]
+
+[Log]
+# log-file="dnsrelay.log"
+log-level="DEBUG"
 
 [Cache]
 backend = "memory"

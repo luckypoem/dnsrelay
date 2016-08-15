@@ -24,7 +24,10 @@ type Config struct {
 	Hosts         Hosts `toml:"Host"`
 
 	// these fields are not fields from config file
-	Logger        *Logger
+	LogConfig     struct {
+			      LogLevel LogLevel `toml:"log-level"`
+			      LogFile  string `toml:"log-file"`
+		      } `toml:"Log"`
 }
 
 func NewConfig(path string) (c *Config, err error) {
@@ -40,11 +43,6 @@ func NewConfig(path string) (c *Config, err error) {
 	}
 	var config Config
 	if err = toml.Unmarshal(buf, &config); err != nil {
-		return
-	}
-
-	config.Logger, err = NewLogger(config.LogFile, "dnsrelay")
-	if err != nil {
 		return
 	}
 

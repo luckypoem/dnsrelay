@@ -5,13 +5,58 @@ import (
 	"os"
 	"io"
 	"fmt"
+	"strings"
 )
 
-type Logger struct {
-	log *logger.Logger
+
+
+// Level defines all available log levels for log messages.
+type LogLevel int
+
+// Log levels.
+const (
+	CRITICAL LogLevel = iota
+	ERROR
+	WARNING
+	NOTICE
+	INFO
+	DEBUG
+)
+
+var levelNames = []string{
+	"CRITICAL",
+	"ERROR",
+	"WARNING",
+	"NOTICE",
+	"INFO",
+	"DEBUG",
 }
 
-func NewLogger(path string, name string) (log *Logger, err error) {
+// String returns the string representation of a logging level.
+func (p LogLevel) String() string {
+	return levelNames[p]
+}
+
+func (self *LogLevel) UnmarshalTOML(data []byte) (err error) {
+	level := string(data)
+	level = strings.TrimSpace(level)
+	level = strings.Trim(level, "\"")
+
+	for i, name := range levelNames {
+		if name == level {
+			*self = LogLevel(i)
+			return
+		}
+	}
+	return fmt.Errorf("logger: invalid log level:%s\nvalid choice:%v\n", level, levelNames)
+}
+
+type Logger struct {
+	log   *logger.Logger
+	level LogLevel
+}
+
+func NewLogger(path string, name string, level LogLevel) (log *Logger, err error) {
 	var f io.WriteCloser
 	var color int
 
@@ -31,103 +76,81 @@ func NewLogger(path string, name string) (log *Logger, err error) {
 		return
 	}
 
-	return &Logger{log:l}, nil
+	return &Logger{log:l, level:level}, nil
 }
 
 
-// Fatal is just like func l,Cr.tical logger except that it is followed by exit to program
-func (l *Logger) Fatal(message string) {
-	l.log.Log("CRITICAL", message)
-	os.Exit(1)
+// IsEnabledFor will return true if logging is enabled for the given module.
+func (l *Logger) IsEnabledFor(level LogLevel) bool {
+	return level <= l.level
 }
 
-// Info logs a message at Info level
-func (l *Logger) Fatalf(f string, args... interface{}) {
-	s := fmt.Sprintf(f, args...)
-	l.log.Log("CRITICAL", s)
-	os.Exit(1)
+func (l *Logger) WriteLog(level LogLevel, msg string) {
+	if l.IsEnabledFor(level) {
+		l.log.Log(level.String(), msg)
+	}
 }
+
+func (l *Logger) WriteLogf(level LogLevel, f string, args... interface{}) {
+	if l.IsEnabledFor(level) {
+		s := fmt.Sprintf(f, args...)
+		l.log.Log(level.String(), s)
+	}
+}
+
 
 // Panic is just like func l.Critical except that it is followed by a call to panic
 func (l *Logger) Panic(message string) {
-	l.log.Log("CRITICAL", message)
+	l.WriteLog(CRITICAL, message)
 	panic(message)
 }
 
 // Info logs a message at Info level
 func (l *Logger) Panicf(f string, args... interface{}) {
-	s := fmt.Sprintf(f, args...)
-	l.log.Log("CRITICAL", s)
-	panic(s)
+	l.WriteLogf(CRITICAL, f, args...)
+	panic("")
 }
-
-// Critical logs a message at a Critical Level
-func (l *Logger) Critical(message string) {
-	l.log.Log("CRITICAL", message)
-}
-
-// Info logs a message at Info level
-func (l *Logger) Criticalf(f string, args... interface{}) {
-	s := fmt.Sprintf(f, args...)
-	l.log.Log("CRITICAL", s)
-}
-
 
 // Error logs a message at Error level
 func (l *Logger) Error(message string) {
-	l.log.Log("ERROR", message)
+	l.WriteLog(ERROR, message)
 }
 
 // Info logs a message at Info level
 func (l *Logger) Errorf(f string, args... interface{}) {
-	s := fmt.Sprintf(f, args...)
-	l.log.Log("ERROR", s)
+	l.WriteLogf(ERROR, f, args...)
 }
 
 
 // Warning logs a message at Warning level
 func (l *Logger) Warning(message string) {
-	l.log.Log("WARNING", message)
+	l.WriteLog(WARNING, message)
 }
 
 // Info logs a message at Info level
 func (l *Logger) Warningf(f string, args... interface{}) {
-	s := fmt.Sprintf(f, args...)
-	l.log.Log("WARNING", s)
+	l.WriteLogf(WARNING, f, args...)
 }
-
-
-// Notice logs a message at Notice level
-func (l *Logger) Notice(message string) {
-	l.log.Log("NOTICE", message)
-}
-
-// Info logs a message at Info level
-func (l *Logger) Noticef(f string, args... interface{}) {
-	s := fmt.Sprintf(f, args...)
-	l.log.Log("NOTICE", s)
-}
-
 
 // Info logs a message at Info level
 func (l *Logger) Info(message string) {
-	l.log.Log("INFO", message)
+	l.WriteLog(INFO, message)
 }
 
 
 // Info logs a message at Info level
 func (l *Logger) Infof(f string, args... interface{}) {
-	s := fmt.Sprintf(f, args...)
-	l.log.Log("INFO", s)
+	l.WriteLogf(INFO, f, args...)
+
 }
 
 // Debug logs a message at Debug level
 func (l *Logger) Debug(message string) {
-	l.log.Log("DEBUG", message)
+	l.WriteLog(DEBUG, message)
 }
 
 // Debug logs a message at Debug level
 func (l *Logger) Debugf(f string, args... interface{}) {
-	s := fmt.Sprintf(f, args...)
-	l.log.Log("DEBUG", s)
+	l.WriteLogf(DEBUG, f, args...)
+
 }
