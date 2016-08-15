@@ -196,8 +196,10 @@ func (ds *DNSServer) isIpOK(dnsGroup string, resultIp net.IP) bool {
 	}
 
 	if dnsGroup == CN_GROUP  && isCN {
+		ds.logger.Debugf("DNS result of CN IP[%s] from CN DNS server can be trusted!", resultIp)
 		return true
 	} else if dnsGroup != CN_GROUP  && !isCN {
+		ds.logger.Debugf("DNS result of NO CN IP[%s] from NO CN DNS server can be trusted!", resultIp)
 		return true
 	}
 
