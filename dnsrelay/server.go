@@ -4,6 +4,7 @@ import (
 	"net"
 	"sync"
 	"github.com/miekg/dns"
+	"github.com/FTwOoO/go-logger"
 	"time"
 	"errors"
 )
@@ -11,7 +12,7 @@ import (
 type DNSServer struct {
 	config    *Config
 	geoReader *Reader
-	logger    *Logger
+	logger    *logger.Logger
 	cache     *MemoryCache
 }
 
@@ -35,7 +36,7 @@ func NewDNSServer(config *Config) (ds *DNSServer, err error) {
 		return nil, errors.New("Cache backend dont support!")
 	}
 
-	logger, err := NewLogger(config.LogConfig.LogFile, "dnsrelay", config.LogConfig.LogLevel)
+	logger, err := logger.NewLogger(config.LogConfig.LogFile, config.LogConfig.LogLevel)
 	if err != nil {
 		return
 	}

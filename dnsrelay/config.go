@@ -4,6 +4,8 @@ import (
 	"github.com/naoina/toml"
 	"os"
 	"io/ioutil"
+	"github.com/FTwOoO/go-logger"
+
 )
 
 type Config struct {
@@ -25,7 +27,7 @@ type Config struct {
 
 	// these fields are not fields from config file
 	LogConfig     struct {
-			      LogLevel LogLevel `toml:"log-level"`
+			      LogLevel logger.LogLevel `toml:"log-level"`
 			      LogFile  string `toml:"log-file"`
 		      } `toml:"Log"`
 }
