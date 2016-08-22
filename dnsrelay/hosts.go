@@ -37,7 +37,7 @@ func (self Hosts) Get(req *dns.Msg) (*dns.Msg, bool) {
 			Name:   question.Name,
 			Rrtype: dns.TypeA,
 			Class:  dns.ClassINET,
-			Ttl:    1,
+			Ttl:    dnsDefaultTtl,
 		}
 		for _, ip := range ips {
 			ip = ip.To4()
@@ -51,7 +51,7 @@ func (self Hosts) Get(req *dns.Msg) (*dns.Msg, bool) {
 			Name:   question.Name,
 			Rrtype: dns.TypeAAAA,
 			Class:  dns.ClassINET,
-			Ttl:    1,
+			Ttl:    dnsDefaultTtl,
 		}
 		for _, ip := range ips {
 			ip = ip.To16()
