@@ -2,7 +2,7 @@
 # use along with the CN group
 fuck-gfw=true
 addr=""
-port=5656
+port=5356
 geoip-mmdb-file="GeoLite2-Country.mmdb"
 
 # Default action is send all queries to DEFAULT groups
@@ -45,7 +45,6 @@ value=[
 
 
 [[DomainRule]]
-# match/suffix/keyword
 match-type="SUFFIX"
 domain-group="REJECT"
 value=["umeng.com"]
