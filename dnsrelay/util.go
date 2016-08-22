@@ -1,10 +1,13 @@
 package dnsrelay
 
-import "github.com/miekg/dns"
+import (
+	"github.com/miekg/dns"
+	"github.com/miekg/dns/dnsutil"
+)
 
 func UnFqdn(s string) string {
 	if dns.IsFqdn(s) {
-		return s[:len(s) - 1]
+		return dnsutil.TrimDomainName(s, ".")
 	}
 	return s
 }

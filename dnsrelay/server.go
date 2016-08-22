@@ -7,6 +7,15 @@ import (
 	"github.com/FTwOoO/go-logger"
 	"time"
 	"errors"
+	"fmt"
+)
+
+const (
+	dnsDefaultPort = 53
+	dnsDefaultTtl = 600
+	dnsDefaultPacketSize = 4096
+	dnsDefaultReadTimeout = 5
+	dnsDefaultWriteTimeout = 5
 )
 
 type DNSServer struct {
@@ -14,6 +23,8 @@ type DNSServer struct {
 	geoReader *Reader
 	logger    *logger.Logger
 	cache     *MemoryCache
+	client    *dns.Client
+	server    *dns.Server
 }
 
 // Create a new DNS server. Domain is an unqualified domain that will be used
@@ -36,6 +47,21 @@ func NewDNSServer(config *Config) (ds *DNSServer, err error) {
 		return nil, errors.New("Cache backend dont support!")
 	}
 
+	client := &dns.Client{
+		Net:          "udp",
+		UDPSize:      dnsDefaultPacketSize,
+		ReadTimeout:  time.Duration(dnsDefaultReadTimeout) * time.Second,
+		WriteTimeout: time.Duration(dnsDefaultWriteTimeout) * time.Second,
+	}
+
+	server := &dns.Server{
+		Net:          "udp",
+		Addr:         fmt.Sprintf("%s:%d", config.ADDR, config.PORT),
+		UDPSize:      dnsDefaultPacketSize,
+		ReadTimeout:  time.Duration(dnsDefaultReadTimeout) * time.Second,
+		WriteTimeout: time.Duration(dnsDefaultWriteTimeout) * time.Second,
+	}
+
 	logger, err := logger.NewLogger(config.LogConfig.LogFile, config.LogConfig.LogLevel)
 	if err != nil {
 		return
@@ -46,7 +72,11 @@ func NewDNSServer(config *Config) (ds *DNSServer, err error) {
 		geoReader:  reader,
 		logger:     logger,
 		cache:      &cache,
+		client:     client,
+		server:     server,
 	}
+
+	ds.server.Handler = dns.HandlerFunc(ds.ServeDNS)
 
 	return
 }
@@ -54,9 +84,9 @@ func NewDNSServer(config *Config) (ds *DNSServer, err error) {
 // Listen for DNS requests. listenSpec is a dotted-quad + port, e.g.,
 // 127.0.0.1:53. This function blocks and only returns when the DNS service is
 // no longer functioning.
-func (ds *DNSServer) Listen(listenSpec string) error {
-	ds.logger.Infof("Listen on %s ...", listenSpec)
-	return dns.ListenAndServe(listenSpec, "udp", ds)
+func (ds *DNSServer) Listen() error {
+	ds.logger.Infof("Listen on %s ...", ds.server.Addr)
+	return ds.server.ListenAndServe()
 }
 
 
@@ -151,6 +181,11 @@ func (ds *DNSServer) sendRequest(req *dns.Msg, dnsgroups []string) (resp *dns.Ms
 			ds.logger.Debugf("Result from group[%s] DNS[%s]: ===>\n %v \n<===\n", result.Group, result.DnsIp.String(), result.Response)
 		}
 
+		if result.Response.Rcode == dns.RcodeServerFailure {
+			ds.logger.Errorf("Resolve on group [%s:%s] failed: code %d", result.Group, result.DnsIp.String(), result.Response.Rcode)
+			continue
+		}
+
 		if len(result.Response.Answer) < 1 {
 			ds.logger.Debugf("0 answer response from  %s", result.DnsIp.String())
 			continue
@@ -218,10 +253,8 @@ func (ds *DNSServer) sendDNSRequestsAsync(req *dns.Msg, results chan <- DNSResul
 			go func(group string, dnsAddr DNSAddresss) {
 				defer wg.Done()
 
-				// err.. is there a async func for dns.Client?
-				c := &dns.Client{Net: "udp", Timeout:10 * time.Second}
-				// 2 seconds to timeout
-				resp, rtt, err := c.Exchange(req, dnsAddr.String())
+				//c := &dns.Client{Net: "udp", Timeout:10 * time.Second}
+				resp, rtt, err := ds.client.Exchange(req, dnsAddr.String())
 				results <- DNSResult{Response:resp, Rtt: rtt, Err: err, Group:group, DnsIp:dnsAddr.Ip}
 
 			}(group, dnsAddr)

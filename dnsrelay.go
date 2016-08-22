@@ -9,7 +9,6 @@ import (
 )
 
 var (
-	address = flag.String("address", "0.0.0.0:5356", "Address to listen to (UDP)")
 	config_path = flag.String("config", "dnsrelay.toml", "Config file")
 )
 
@@ -17,7 +16,7 @@ func main() {
 	// this is your domain. All records will be scoped under it, e.g.,
 	// 'test.docker' below.
 
-	if *address == "" || *config_path == "" {
+	if *config_path == "" {
 		panic("Arguments missing")
 	}
 
@@ -31,7 +30,7 @@ func main() {
 		panic(err)
 	}
 
-	if err := ds.Listen(*address); err != nil {
+	if err := ds.Listen(); err != nil {
 		panic(err)
 	}
 

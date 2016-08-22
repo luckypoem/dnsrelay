@@ -5,11 +5,12 @@ import (
 	"os"
 	"io/ioutil"
 	"github.com/FTwOoO/go-logger"
-
 )
 
 type Config struct {
 	GeoIPDBPath   string   `toml:"geoip-mmdb-file"`
+	ADDR          string   `toml:"addr"`
+	PORT          uint     `toml:"port"`
 	CacheNum      uint     `toml:"cache-num"`
 	FuckGFW       bool     `toml:"fuck-gfw"`
 	DefaultGroups []string `toml:"default-group"`
