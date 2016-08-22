@@ -141,7 +141,7 @@ func (ds *DNSServer) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			if hitCache == true {
 				ds.logger.Debugf("No need to insert %s into cache", question.Name)
 
-			} else if err := ds.cache.Set(question.Name, resp); err != nil {
+			} else if err := ds.cache.Set(question.Name, resp, resp.Answer[0].Header().Ttl); err != nil {
 				ds.logger.Warningf("Set %s cache failed: %s", question.Name, err.Error())
 			} else {
 				ds.logger.Debugf("Insert %s into cache", question.Name)
