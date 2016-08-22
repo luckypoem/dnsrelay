@@ -100,11 +100,11 @@ func (self *IPNetList) UnmarshalTOML(data []byte) error {
 		subnet = strings.TrimSpace(subnet)
 		subnet = strings.Trim(subnet, "\"")
 
-		_, obj, err := net.ParseCIDR(subnet)
+		_, ipNet, err := net.ParseCIDR(subnet)
 		if err != nil {
 			return err
 		} else {
-			*self = append(*self, *obj)
+			*self = append(*self, *ipNet)
 		}
 	}
 	return nil
