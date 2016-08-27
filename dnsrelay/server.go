@@ -39,10 +39,11 @@ func NewDNSServer(config *Config) (ds *DNSServer, err error) {
 	switch config.DNSCache.Backend {
 	case "memory":
 		cache = MemoryCache{
-			Backend:  make(map[string]Mesg, config.DNSCache.Maxcount),
-			Expire:   time.Duration(config.DNSCache.Expire) * time.Second,
+			Backend:  make(map[string]DomainRecord, config.DNSCache.Maxcount),
+			DefaultTtl:   time.Duration(config.DNSCache.Expire),
 			Maxcount: config.DNSCache.Maxcount,
 		}
+		cache.Serve()
 	default:
 		return nil, errors.New("Cache backend dont support!")
 	}
@@ -141,7 +142,7 @@ func (ds *DNSServer) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			if hitCache == true {
 				ds.logger.Debugf("No need to insert %s into cache", question.Name)
 
-			} else if err := ds.cache.Set(question.Name, resp, resp.Answer[0].Header().Ttl); err != nil {
+			} else if err := ds.cache.Set(question.Name, resp, time.Duration(resp.Answer[0].Header().Ttl)); err != nil {
 				ds.logger.Warningf("Set %s cache failed: %s", question.Name, err.Error())
 			} else {
 				ds.logger.Debugf("Insert %s into cache", question.Name)

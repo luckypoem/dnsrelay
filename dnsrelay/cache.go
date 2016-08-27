@@ -29,24 +29,40 @@ func (e KeyExpired) Error() string {
 	return e.Key + " " + "expired"
 }
 
-type CacheIsFull struct {
-}
-
+type CacheIsFull struct{}
 func (e CacheIsFull) Error() string {
 	return "Cache is Full"
 }
 
-type SerializerError struct {
-}
+type SerializerError struct{}
 
 func (e SerializerError) Error() string {
 	return "Serializer error"
 }
 
-type Mesg struct {
+type DomainRecord struct {
 	Msg    *dns.Msg
+	Ttl    time.Duration
 	Expire time.Time
+	Hit    int
+	mu     *sync.RWMutex
+
 }
+
+func (record *DomainRecord) Touch() {
+	record.mu.Lock()
+	defer record.mu.Unlock()
+
+	record.Hit++
+}
+
+func (record *DomainRecord) IsTimeout() bool {
+	record.mu.RLock()
+	defer record.mu.RUnlock()
+
+	return time.Now().After(record.Expire)
+}
+
 
 type Cache interface {
 	Get(key string) (Msg *dns.Msg, err error)
@@ -54,45 +70,54 @@ type Cache interface {
 	Exists(key string) bool
 	Remove(key string)
 	Length() int
+	Serve()
 }
 
 type MemoryCache struct {
-	Backend  map[string]Mesg
-	Expire   time.Duration
-	Maxcount int
-	mu       sync.RWMutex
+	Backend    map[string]DomainRecord
+	DefaultTtl time.Duration
+	Maxcount   int
+	mu         sync.RWMutex
 }
 
 func (c *MemoryCache) Get(key string) (*dns.Msg, error) {
 	c.mu.RLock()
-	mesg, ok := c.Backend[key]
+	record, ok := c.Backend[key]
 	c.mu.RUnlock()
+
 	if !ok {
 		return nil, KeyNotFound{key}
 	}
 
-	if mesg.Expire.Before(time.Now()) {
+	if record.IsTimeout() {
 		c.Remove(key)
 		return nil, KeyExpired{key}
 	}
 
-	return mesg.Msg, nil
+	record.Touch()
+	return record.Msg, nil
 }
 
-func (c *MemoryCache) Set(key string, msg *dns.Msg, ttl uint32) error {
+func (c *MemoryCache) Set(key string, msg *dns.Msg, ttl time.Duration) error {
 	if c.Full() && !c.Exists(key) {
 		return CacheIsFull{}
 	}
 
-	var expire time.Time
 	if ttl == 0 {
-		expire = time.Now().Add(c.Expire)
-	} else {
-		expire = time.Now().Add(time.Duration(ttl) * time.Second)
+		ttl = c.DefaultTtl
 	}
-	mesg := Mesg{msg, expire}
+
+	record := DomainRecord{
+		Msg:msg,
+		Ttl:ttl,
+		Expire:time.Now().Add(ttl * time.Second),
+		Hit:0,
+		mu:new(sync.RWMutex),
+	}
+	record.Touch()
+
 	c.mu.Lock()
-	c.Backend[key] = mesg
+	c.Backend[key] = record
 	c.mu.Unlock()
 	return nil
 }
@@ -117,10 +142,24 @@ func (c *MemoryCache) Length() int {
 }
 
 func (c *MemoryCache) Full() bool {
-	// if Maxcount is zero. the cache will never be full.
 	if c.Maxcount == 0 {
 		return false
 	}
 	return c.Length() >= c.Maxcount
+}
+
+func (c *MemoryCache) Serve() {
+	go func() {
+		tick := time.Tick(30 * time.Second)
+		for _ = range tick {
+			c.mu.Lock()
+			for domain, record := range c.Backend {
+				if record.IsTimeout() {
+					delete(c.Backend, domain)
+				}
+			}
+			c.mu.Unlock()
+		}
+	}()
 }
 
