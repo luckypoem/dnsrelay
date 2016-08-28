@@ -16,9 +16,5 @@ func NewIPBlocker(ips IPList) (*IPFilter) {
 }
 
 func (self *IPFilter) FindIP(ip net.IP) bool {
-	i := sort.Search(len(self.Ip), func(i int) bool {
-		// TODO: support IPv6
-		return IPToInt(self.Ip[i]) >= IPToInt(ip)
-	})
-	return i < len(self.Ip) && self.Ip[i].Equal(ip)
+	return self.Ip.FindIP(ip)
 }

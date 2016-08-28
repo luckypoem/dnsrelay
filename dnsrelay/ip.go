@@ -6,6 +6,7 @@ import (
 	"strings"
 	"fmt"
 	"strconv"
+	"sort"
 )
 
 type DNSAddresss struct {
@@ -68,6 +69,19 @@ func (a IPList) Less(i, j int) bool {
 	return IPToInt(a[i]) < IPToInt(a[j])
 }
 
+func (a IPList) Sort() {
+	sort.Sort(a)
+}
+
+func (self IPList) FindIP(ip net.IP) bool {
+	// TODO: support IPv6
+
+	i := sort.Search(len(self), func(i int) bool {
+		return IPToInt(self[i]) >= IPToInt(ip)
+	})
+	return i < len(self) && self[i].Equal(ip)
+}
+
 func (self *IPList) UnmarshalTOML(data []byte) (err error) {
 	s := string(data)
 	s = strings.TrimSpace(s)
@@ -85,6 +99,8 @@ func (self *IPList) UnmarshalTOML(data []byte) (err error) {
 			*self = append(*self, ipobj)
 		}
 	}
+
+	self.Sort()
 	return nil
 }
 
