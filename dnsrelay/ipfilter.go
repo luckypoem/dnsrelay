@@ -16,5 +16,5 @@ func NewIPBlocker(ips IPList) (*IPFilter) {
 }
 
 func (self *IPFilter) FindIP(ip net.IP) bool {
-	return self.Ip.FindIP(ip)
+	return self.Ip.Contains(ip) || self.Net.Contains(ip)
 }

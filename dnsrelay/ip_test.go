@@ -22,7 +22,7 @@ import (
 	"net"
 )
 
-func TestIPList_FindIP(t *testing.T) {
+func TestIPList_Contains(t *testing.T) {
 	ips := IPList{
 		net.IP{1, 1, 1, 1},
 		net.IP{2, 2, 2, 2},
@@ -32,8 +32,33 @@ func TestIPList_FindIP(t *testing.T) {
 	ips.Sort()
 
 	for _, ip := range ips {
-		if ips.FindIP(ip) != true {
+		if ips.Contains(ip) != true {
 			t.Fatalf("Ip %v is not in %v", ip, ips)
 		}
 	}
+}
+
+func TestIPNetList_Contains(t *testing.T) {
+	ips := IPList{
+		net.IP{32, 32, 32, 5},
+		net.IP{17, 3, 2, 2},
+		net.IP{22, 33, 44, 254},
+		net.IP{22, 33, 44, 253},
+	}
+
+	netl := new(IPNetList)
+	err := netl.UnmarshalTOML([]byte(`[
+	    "32.32.32.0/24", "17.3.4.2/16", "22.33.44.253/30",
+	    ]`))
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, ip := range ips {
+		if netl.Contains(ip) != true {
+			t.Fatalf("Ip %v is not in %v", ip, netl)
+		}
+	}
+
 }

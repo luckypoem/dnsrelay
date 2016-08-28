@@ -22,7 +22,6 @@ Thans to [godns](https://github.com/kenshinx/godns),[grimd](https://github.com/l
 
 ## TODO
 1. Load all mostly used domain names at startup
-2. Supporting Ip filtering by subnet config
 
 ## Notice
 If DNS protocol are poisoning and filtering like in  China, DNS server like 8.8.8.8 may not response, so VPN(and some routing tables entry for 8.8.8.8, e.g.) is required to get dnsrelay work.

@@ -73,7 +73,7 @@ func (a IPList) Sort() {
 	sort.Sort(a)
 }
 
-func (self IPList) FindIP(ip net.IP) bool {
+func (self IPList) Contains(ip net.IP) bool {
 	// TODO: support IPv6
 
 	i := sort.Search(len(self), func(i int) bool {
@@ -91,6 +91,9 @@ func (self *IPList) UnmarshalTOML(data []byte) (err error) {
 	for _, ip := range arr {
 		ip = strings.TrimSpace(ip)
 		ip = strings.Trim(ip, "\"")
+		if ip == "" {
+			continue
+		}
 
 		ipobj := net.ParseIP(ip)
 		if ipobj == nil {
@@ -104,7 +107,44 @@ func (self *IPList) UnmarshalTOML(data []byte) (err error) {
 	return nil
 }
 
-type IPNetList []net.IPNet
+type IPRange struct {
+	Subnet *net.IPNet
+	Start  uint32
+	End    uint32
+}
+type IPNetList []IPRange
+
+func (a IPNetList) Len() int {
+	return len(a)
+}
+func (a IPNetList) Less(i, j int) bool {
+	return a[i].End < a[j].End
+}
+func (a IPNetList) Swap(i, j int) {
+	a[i], a[j] = a[j], a[i]
+}
+
+func (a IPNetList) Sort() {
+	sort.Sort(a)
+}
+
+func (a IPNetList) Contains(ip net.IP) bool {
+	ipval := IPToInt(ip.To4())
+
+	l := len(a)
+	i := sort.Search(l, func(i int) bool {
+		n := a[i]
+		return n.End >= ipval
+	})
+
+	if i < l {
+		n := a[i]
+		if n.Start <= ipval {
+			return true
+		}
+	}
+	return false
+}
 
 func (self *IPNetList) UnmarshalTOML(data []byte) error {
 	s := string(data)
@@ -115,15 +155,31 @@ func (self *IPNetList) UnmarshalTOML(data []byte) error {
 	for _, subnet := range arr {
 		subnet = strings.TrimSpace(subnet)
 		subnet = strings.Trim(subnet, "\"")
+		if subnet == "" {
+			continue
+		}
 
 		_, ipNet, err := net.ParseCIDR(subnet)
 		if err != nil {
+			fmt.Println("ERR!")
 			return err
 		} else {
-			*self = append(*self, *ipNet)
+			start := IPToInt(ipNet.IP)
+			end := start + ^IPToInt(net.IP(ipNet.Mask))
+
+			*self = append(*self, IPRange{Subnet:ipNet, Start:start, End:end})
 		}
 	}
+
+	self.Sort()
 	return nil
 }
+
+
+
+
+
+
+
 
 
