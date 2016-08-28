@@ -1,6 +1,6 @@
 # dnsrelay
 
-dnsrelay is a DNS proxy like [godns](https://github.com/kenshinx/godns)and [ChinaDNS](https://github.com/shadowsocks/ChinaDNS). The goal of this project is to escape from DNS poisoning powered by GFW(The Great Firewall   Of China)
+dnsrelay is a DNS proxy like [godns](https://github.com/kenshinx/godns) and [ChinaDNS](https://github.com/shadowsocks/ChinaDNS). The goal of this project is to escape from DNS poisoning powered by GFW(The Great Firewall   Of China)
 
 Thans to [godns](https://github.com/kenshinx/godns),[grimd](https://github.com/looterz/grimd),[ChinaDNS](https://github.com/shadowsocks/ChinaDNS),[dnsserver](https://github.com/docker/dnsserver),[dns-reverse-proxy](https://github.com/StalkR/dns-reverse-proxy) for the idea.
 
@@ -22,12 +22,10 @@ Thans to [godns](https://github.com/kenshinx/godns),[grimd](https://github.com/l
 
 ## TODO
 1. Load all mostly used domain names at startup
-2. Cache optimization
-3. Supporting Ip filtering by subnet config
+2. Supporting Ip filtering by subnet config
 
 ## Notice
-If DNS protocol are poisoning and filtering like in  China, DNS server like 8.8.8.8 may not response, so VPN(and system routing tables entry for 8.8.8.8, e.g.) is required to get dnsrelay work.
-
+If DNS protocol are poisoning and filtering like in  China, DNS server like 8.8.8.8 may not response, so VPN(and some routing tables entry for 8.8.8.8, e.g.) is required to get dnsrelay work.
 
 ## Configuration
 
@@ -51,8 +49,8 @@ For example, if there is a DNS request asking A record for “baidu.com”, the 
 
 ```
 [[DomainRule]]
-match-type="MATCH"
-domain-group="CN"
+scheme="DOMAIN-MATCH"
+group="CN"
 value=[
     "order.mi.com",
     "baidu.com",
