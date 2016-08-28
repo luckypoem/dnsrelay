@@ -10,7 +10,7 @@ import (
 
 func TestDomainRules(t *testing.T) {
 	rule := DomainRule{Group:CN_GROUP,
-		MatchType:MATCH_TYPE_DOMAIN_SUFFIX,
+		MatchType:SCHEME_DOMAIN_SUFFIX,
 		Values:[]string{"baidu.com", "xiaomi.com"},
 	}
 

@@ -35,9 +35,8 @@ CN=["192.168.1.1", "114.114.114.114", "223.6.6.6:53", "223.5.5.5"]
 FG=["8.8.8.8", "8.8.4.4"]
 
 [[DomainRule]]
-# MATCH/SUFFIX/KEYWORD
-match-type="MATCH"
-domain-group="CN"
+scheme="DOMAIN"
+group="CN"
 value=[
     "order.mi.com",
     "baidu.com",
@@ -45,8 +44,8 @@ value=[
 
 
 [[DomainRule]]
-match-type="SUFFIX"
-domain-group="REJECT"
+scheme="DOMAIN-SUFFIX"
+group="REJECT"
 value=["umeng.com"]
 
 

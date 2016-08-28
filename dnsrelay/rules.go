@@ -9,9 +9,9 @@ const (
 	FG_GROUP = "FG"
 	REJECT_GROUP = "REJECT"
 
-	MATCH_TYPE_DOMAIN_SUFFIX = "SUFFIX"
-	MATCH_TYPE_DOMAIN_MATCH = "MATCH"
-	MATCH_TYPE_DOMAIN_KEYWORD = "KEYWORD"
+	SCHEME_DOMAIN_SUFFIX = "DOMAIN-SUFFIX"
+	SCHEME_DOMAIN_MATCH = "DOMAIN"
+	SCHEME_DOMAIN_KEYWORD = "DOMAIN-KEYWORD"
 )
 
 type DomainRules []DomainRule
@@ -26,8 +26,8 @@ func (self DomainRules) findGroup(domain string) string {
 }
 
 type DomainRule struct {
-	MatchType string `toml:"match-type"`
-	Group     string `toml:"domain-group"`
+	MatchType string `toml:"scheme"`
+	Group     string `toml:"group"`
 	Values    []string `toml:"value"`
 }
 
@@ -35,15 +35,15 @@ func (rule DomainRule) Match(input string) bool {
 
 	for _, value := range rule.Values {
 		switch rule.MatchType {
-		case MATCH_TYPE_DOMAIN_MATCH:
+		case SCHEME_DOMAIN_MATCH:
 			if input == value {
 				return true
 			}
-		case MATCH_TYPE_DOMAIN_SUFFIX:
+		case SCHEME_DOMAIN_SUFFIX:
 			if strings.HasSuffix(input, value) {
 				return true
 			}
-		case MATCH_TYPE_DOMAIN_KEYWORD:
+		case SCHEME_DOMAIN_KEYWORD:
 			if strings.Contains(input, value) {
 				return true
 			}
