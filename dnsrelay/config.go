@@ -5,6 +5,8 @@ import (
 	"os"
 	"io/ioutil"
 	"github.com/FTwOoO/go-logger"
+	"github.com/FTwOoO/vpncore/net/rule"
+	"github.com/FTwOoO/vpncore/net/addr"
 )
 
 type Config struct {
@@ -16,15 +18,15 @@ type Config struct {
 	DefaultGroups []string `toml:"default-group"`
 	LogFile       string   `toml:"log-file"`
 
-	IPFilter      IPFilter `toml:"IPFilter"`
+	IPFilter      rule.IPBlocker `toml:"IPFilter"`
 
 	DNSCache      DNSCache  `toml:"Cache"`
 
-	DNSGroups     map[string][]DNSAddresss `toml:"DNSGroup"`
+	DNSGroups     map[string][]addr.DNSAddresss `toml:"DNSGroup"`
 
-	DomainRules   DomainRules `toml:"DomainRule"`
+	DomainRules   rule.DomainRules `toml:"DomainRule"`
 
-	Hosts         Hosts `toml:"Host"`
+	Hosts         addr.Hosts `toml:"Host"`
 
 	// these fields are not fields from config file
 	LogConfig     struct {

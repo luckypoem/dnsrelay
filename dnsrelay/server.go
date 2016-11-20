@@ -5,6 +5,10 @@ import (
 	"sync"
 	"github.com/miekg/dns"
 	"github.com/FTwOoO/go-logger"
+	"github.com/FTwOoO/vpncore/net/geoip"
+	"github.com/FTwOoO/vpncore/net/rule"
+	"github.com/FTwOoO/vpncore/net/addr"
+
 	"time"
 	"errors"
 	"fmt"
@@ -20,7 +24,7 @@ const (
 
 type DNSServer struct {
 	config    *Config
-	geoReader *Reader
+	geoReader *geoip.Reader
 	logger    *logger.Logger
 	cache     *MemoryCache
 	client    *dns.Client
@@ -30,7 +34,7 @@ type DNSServer struct {
 // Create a new DNS server. Domain is an unqualified domain that will be used
 // as the TLD.
 func NewDNSServer(config *Config) (ds *DNSServer, err error) {
-	reader, err := Open(config.GeoIPDBPath)
+	reader, err := geoip.Open(config.GeoIPDBPath)
 	if err != nil {
 		return nil, err
 	}
@@ -121,8 +125,8 @@ func (ds *DNSServer) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	}
 
 	if resp == nil {
-		group := ds.config.DomainRules.findGroup(UnFqdn(question.Name))
-		if group == REJECT_GROUP {
+		group := ds.config.DomainRules.FindGroup(question.Name)
+		if group == rule.REJECT_GROUP {
 			ds.logger.Debugf("Reject %s!", question.Name)
 			resp = nil
 		} else if group != "" {
@@ -225,17 +229,17 @@ func (ds *DNSServer) isIpOK(dnsGroup string, resultIp net.IP) bool {
 
 	if err != nil {
 		ds.logger.Errorf("cant reconize the localtion of ip:%s", resultIp.String())
-		if dnsGroup != CN_GROUP {
+		if dnsGroup != rule.CN_GROUP {
 			return true
 		} else {
 			return false
 		}
 	}
 
-	if dnsGroup == CN_GROUP  && isCN {
+	if dnsGroup == rule.CN_GROUP  && isCN {
 		ds.logger.Debugf("DNS result of CN IP[%s] from CN DNS server can be trusted!", resultIp)
 		return true
-	} else if dnsGroup != CN_GROUP  && !isCN {
+	} else if dnsGroup != rule.CN_GROUP  && !isCN {
 		ds.logger.Debugf("DNS result of NO CN IP[%s] from NO CN DNS server can be trusted!", resultIp)
 		return true
 	}
@@ -251,7 +255,7 @@ func (ds *DNSServer) sendDNSRequestsAsync(req *dns.Msg, results chan <- DNSResul
 		wg.Add(len(dnsL))
 
 		for _, dnsAddr := range dnsL {
-			go func(group string, dnsAddr DNSAddresss) {
+			go func(group string, dnsAddr addr.DNSAddresss) {
 				defer wg.Done()
 
 				//c := &dns.Client{Net: "udp", Timeout:10 * time.Second}
