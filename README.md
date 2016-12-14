@@ -4,7 +4,7 @@ dnsrelay is a DNS proxy like [godns](https://github.com/kenshinx/godns) and [Chi
 
 Thans to [godns](https://github.com/kenshinx/godns),[grimd](https://github.com/looterz/grimd),[ChinaDNS](https://github.com/shadowsocks/ChinaDNS),[dnsserver](https://github.com/docker/dnsserver) and [dns-reverse-proxy](https://github.com/StalkR/dns-reverse-proxy) for the idea.
 
-# Depandencies
+## Depandencies
 * [go dns](https://github.com/miekg/dns)
 * [toml](https://github.com/naoina/toml), [TOML config file](https://github.com/toml-lang/toml/blob/master/versions/en/toml-v0.4.0.md) parsing 
 * [go-logger](https://github.com/apsdehal/go-logger)
