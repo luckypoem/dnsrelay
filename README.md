@@ -1,13 +1,10 @@
 # dnsrelay
 
-dnsrelay is a DNS proxy like [godns](https://github.com/kenshinx/godns) and [ChinaDNS](https://github.com/shadowsocks/ChinaDNS). The goal of this project is to escape from DNS poisoning powered by GFW(The Great Firewall   Of China)
+dnsrelay is a DNS proxy like [godns](https://github.com/kenshinx/godns) and [ChinaDNS](https://github.com/shadowsocks/ChinaDNS). The goal of this project is to defeat DNS poisoning powered by GFW(The Great Firewall of China)
 
-Thans to [godns](https://github.com/kenshinx/godns),[grimd](https://github.com/looterz/grimd),[ChinaDNS](https://github.com/shadowsocks/ChinaDNS),[dnsserver](https://github.com/docker/dnsserver),[dns-reverse-proxy](https://github.com/StalkR/dns-reverse-proxy) for the idea.
+Thans to [godns](https://github.com/kenshinx/godns),[grimd](https://github.com/looterz/grimd),[ChinaDNS](https://github.com/shadowsocks/ChinaDNS),[dnsserver](https://github.com/docker/dnsserver) and [dns-reverse-proxy](https://github.com/StalkR/dns-reverse-proxy) for the idea.
 
-# depandencies
-
-* [GeoLite2 Free Downloadable Databases](http://dev.maxmind.com/geoip/geoip2/geolite2/)
-* [geoip2-golang](https://github.com/oschwald/geoip2-golang) and [maxminddb-golang](https://github.com/oschwald/maxminddb-golang), open source Third-Party [MaxMind](http://maxmind.github.io/MaxMind-DB/) Reader for Golang
+# Depandencies
 * [go dns](https://github.com/miekg/dns)
 * [toml](https://github.com/naoina/toml), [TOML config file](https://github.com/toml-lang/toml/blob/master/versions/en/toml-v0.4.0.md) parsing 
 * [go-logger](https://github.com/apsdehal/go-logger)
@@ -21,7 +18,7 @@ Thans to [godns](https://github.com/kenshinx/godns),[grimd](https://github.com/l
 6. Black IP list for filtering untrusted DNS results
 
 ## TODO
-1. Load all mostly used domain names at startup
+* Load all mostly used domain names at startup
 
 ## Notice
 If DNS protocol are poisoning and filtering like in  China, DNS server like 8.8.8.8 may not response, so VPN(and some routing tables entry for 8.8.8.8, e.g.) is required to get dnsrelay work.
