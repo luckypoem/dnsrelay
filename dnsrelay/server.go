@@ -22,18 +22,31 @@ const (
 	dnsDefaultWriteTimeout = 5
 )
 
+type dnsServerInternal interface {
+	ListenAndServe() error
+}
+
 type DNSServer struct {
 	config    *Config
 	geoReader *geoip.Reader
 	logger    *logger.Logger
 	cache     *MemoryCache
 	client    *dns.Client
-	server    *dns.Server
 }
 
-// Create a new DNS server. Domain is an unqualified domain that will be used
-// as the TLD.
-func NewDNSServer(config *Config) (ds *DNSServer, err error) {
+func CreateNormalDnsServer(addr string) (dnsServerInternal, error) {
+	server := &dns.Server{
+		Net:          "udp",
+		Addr:         addr,
+		UDPSize:      dnsDefaultPacketSize,
+		ReadTimeout:  time.Duration(dnsDefaultReadTimeout) * time.Second,
+		WriteTimeout: time.Duration(dnsDefaultWriteTimeout) * time.Second,
+	}
+
+	return server, nil
+}
+
+func NewDNSServer(config *Config, customDnsServer dnsServerInternal) (ds *DNSServer, err error) {
 	reader, err := geoip.Open(config.GeoIPDBPath)
 	if err != nil {
 		return nil, err
@@ -59,15 +72,7 @@ func NewDNSServer(config *Config) (ds *DNSServer, err error) {
 		WriteTimeout: time.Duration(dnsDefaultWriteTimeout) * time.Second,
 	}
 
-	server := &dns.Server{
-		Net:          "udp",
-		Addr:         fmt.Sprintf("%s:%d", config.ADDR, config.PORT),
-		UDPSize:      dnsDefaultPacketSize,
-		ReadTimeout:  time.Duration(dnsDefaultReadTimeout) * time.Second,
-		WriteTimeout: time.Duration(dnsDefaultWriteTimeout) * time.Second,
-	}
-
-	logger, err := logger.NewLogger(config.LogConfig.LogFile, config.LogConfig.LogLevel)
+	mlogger, err := logger.NewLogger(config.LogConfig.LogFile, config.LogConfig.LogLevel)
 	if err != nil {
 		return
 	}
@@ -75,23 +80,20 @@ func NewDNSServer(config *Config) (ds *DNSServer, err error) {
 	ds = &DNSServer{
 		config:     config,
 		geoReader:  reader,
-		logger:     logger,
+		logger:     mlogger,
 		cache:      &cache,
 		client:     client,
-		server:     server,
 	}
 
-	ds.server.Handler = dns.HandlerFunc(ds.ServeDNS)
-
+	var inDnsServ dnsServerInternal
+	if customDnsServer == nil {
+		inDnsServ, _ = CreateNormalDnsServer(fmt.Sprintf("%s:%d", config.ADDR, config.PORT))
+		if inDs, ok := inDnsServ.(*dns.Server); ok {
+			inDs.Handler = ds
+		}
+	}
+	go inDnsServ.ListenAndServe()
 	return
-}
-
-// Listen for DNS requests. listenSpec is a dotted-quad + port, e.g.,
-// 127.0.0.1:53. This function blocks and only returns when the DNS service is
-// no longer functioning.
-func (ds *DNSServer) Listen() error {
-	ds.logger.Infof("Listen on %s ...", ds.server.Addr)
-	return ds.server.ListenAndServe()
 }
 
 

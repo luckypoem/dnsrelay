@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"github.com/labstack/gommon/log"
 )
 
 var (
@@ -25,14 +26,11 @@ func main() {
 		panic(err)
 	}
 
-	ds, err := dnsrelay.NewDNSServer(config)
+	_, err = dnsrelay.NewDNSServer(config, nil)
 	if err != nil {
 		panic(err)
 	}
-
-	if err := ds.Listen(); err != nil {
-		panic(err)
-	}
+	log.Printf("Server started!\n")
 
 	// Wait for SIGINT or SIGTERM
 	sigs := make(chan os.Signal, 1)
