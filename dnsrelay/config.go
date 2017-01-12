@@ -13,7 +13,6 @@ type Config struct {
 	GeoIPDBPath   string   `toml:"geoip-mmdb-file"`
 	ADDR          string   `toml:"addr"`
 	PORT          uint     `toml:"port"`
-	CacheNum      uint     `toml:"cache-num"`
 	FuckGFW       bool     `toml:"fuck-gfw"`
 	DefaultGroups []string `toml:"default-group"`
 	LogFile       string   `toml:"log-file"`
@@ -28,7 +27,6 @@ type Config struct {
 
 	Hosts         addr.Hosts `toml:"Host"`
 
-	// these fields are not fields from config file
 	LogConfig     struct {
 			      LogLevel logger.LogLevel `toml:"log-level"`
 			      LogFile  string `toml:"log-file"`

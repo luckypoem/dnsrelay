@@ -26,7 +26,7 @@ func main() {
 		panic(err)
 	}
 
-	_, err = dnsrelay.NewDNSServer(config, nil)
+	_, err = dnsrelay.NewDNSServer(config, false)
 	if err != nil {
 		panic(err)
 	}

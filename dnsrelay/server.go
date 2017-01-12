@@ -22,10 +22,6 @@ const (
 	dnsDefaultWriteTimeout = 5
 )
 
-type dnsServerInternal interface {
-	ListenAndServe() error
-}
-
 type DNSServer struct {
 	config    *Config
 	geoReader *geoip.Reader
@@ -34,7 +30,7 @@ type DNSServer struct {
 	client    *dns.Client
 }
 
-func CreateNormalDnsServer(addr string) (dnsServerInternal, error) {
+func CreateNormalDnsServer(addr string) (*dns.Server, error) {
 	server := &dns.Server{
 		Net:          "udp",
 		Addr:         addr,
@@ -46,11 +42,7 @@ func CreateNormalDnsServer(addr string) (dnsServerInternal, error) {
 	return server, nil
 }
 
-func NewDNSServer(config *Config, customDnsServer dnsServerInternal) (ds *DNSServer, err error) {
-	reader, err := geoip.Open(config.GeoIPDBPath)
-	if err != nil {
-		return nil, err
-	}
+func NewDNSServer(config *Config, customDnsServer bool) (ds *DNSServer, err error) {
 
 	var cache MemoryCache
 	switch config.DNSCache.Backend {
@@ -77,6 +69,14 @@ func NewDNSServer(config *Config, customDnsServer dnsServerInternal) (ds *DNSSer
 		return
 	}
 
+	var reader *geoip.Reader
+	if config.GeoIPDBPath != "" {
+		reader, err = geoip.Open(config.GeoIPDBPath)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	ds = &DNSServer{
 		config:     config,
 		geoReader:  reader,
@@ -85,14 +85,12 @@ func NewDNSServer(config *Config, customDnsServer dnsServerInternal) (ds *DNSSer
 		client:     client,
 	}
 
-	var inDnsServ dnsServerInternal
-	if customDnsServer == nil {
-		inDnsServ, _ = CreateNormalDnsServer(fmt.Sprintf("%s:%d", config.ADDR, config.PORT))
-		if inDs, ok := inDnsServ.(*dns.Server); ok {
-			inDs.Handler = ds
-		}
+	if customDnsServer == false {
+		inDnsServ, _ := CreateNormalDnsServer(fmt.Sprintf("%s:%d", config.ADDR, config.PORT))
+		inDnsServ.Handler = ds
+		go inDnsServ.ListenAndServe()
 	}
-	go inDnsServ.ListenAndServe()
+
 	return
 }
 
