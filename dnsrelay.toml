@@ -1,8 +1,7 @@
 
 # use along with the CN group
 fuck-gfw=true
-addr=""
-port=5356
+addr=":5356"
 geoip-mmdb-file="GeoLite2-Country.mmdb"
 
 # Default action is send all queries to DEFAULT groups

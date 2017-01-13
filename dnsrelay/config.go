@@ -11,11 +11,9 @@ import (
 
 type Config struct {
 	GeoIPDBPath   string   `toml:"geoip-mmdb-file"`
-	ADDR          string   `toml:"addr"`
-	PORT          uint     `toml:"port"`
+	Addr          string   `toml:"addr"`
 	FuckGFW       bool     `toml:"fuck-gfw"`
 	DefaultGroups []string `toml:"default-group"`
-	LogFile       string   `toml:"log-file"`
 
 	IPFilter      rule.IPBlocker `toml:"IPFilter"`
 

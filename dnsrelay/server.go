@@ -11,7 +11,6 @@ import (
 
 	"time"
 	"errors"
-	"fmt"
 )
 
 const (
@@ -86,7 +85,7 @@ func NewDNSServer(config *Config, customDnsServer bool) (ds *DNSServer, err erro
 	}
 
 	if customDnsServer == false {
-		inDnsServ, _ := CreateNormalDnsServer(fmt.Sprintf("%s:%d", config.ADDR, config.PORT))
+		inDnsServ, _ := CreateNormalDnsServer(config.Addr)
 		inDnsServ.Handler = ds
 		go inDnsServ.ListenAndServe()
 	}
