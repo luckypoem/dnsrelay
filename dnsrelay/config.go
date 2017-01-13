@@ -9,6 +9,11 @@ import (
 	"github.com/FTwOoO/vpncore/net/addr"
 )
 
+type LogConfig  struct {
+	LogLevel logger.LogLevel `toml:"log-level"`
+	LogFile  string `toml:"log-file"`
+}
+
 type Config struct {
 	GeoIPDBPath   string   `toml:"geoip-mmdb-file"`
 	Addr          string   `toml:"addr"`
@@ -25,10 +30,7 @@ type Config struct {
 
 	Hosts         addr.Hosts `toml:"Host"`
 
-	LogConfig     struct {
-			      LogLevel logger.LogLevel `toml:"log-level"`
-			      LogFile  string `toml:"log-file"`
-		      } `toml:"Log"`
+	LogConfig     LogConfig  `toml:"Log"`
 }
 
 func NewConfig(path string) (c *Config, err error) {
