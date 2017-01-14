@@ -13,8 +13,8 @@ log-level="DEBUG"
 
 [Cache]
 backend = "memory"
-expire = 3600
-maxcount = 500
+min-expire = 60
+max-count = 500
 
 [IPFilter]
 ip=[

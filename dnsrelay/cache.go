@@ -8,9 +8,9 @@ import (
 )
 
 type DNSCache struct {
-	Backend  string
-	Expire   int
-	Maxcount int
+	Backend   string `toml:"backend"`
+	MinExpire int `toml:"min-expire"`
+	MaxCount  int `toml:"max-count"`
 }
 
 type KeyNotFound struct {
@@ -74,10 +74,10 @@ type Cache interface {
 }
 
 type MemoryCache struct {
-	Backend    map[string]DomainRecord
-	DefaultTtl time.Duration
-	Maxcount   int
-	mu         sync.RWMutex
+	Backend  map[string]DomainRecord
+	MinTtl   time.Duration
+	Maxcount int
+	mu       sync.RWMutex
 }
 
 func (c *MemoryCache) Get(key string) (*dns.Msg, error) {
@@ -99,12 +99,16 @@ func (c *MemoryCache) Get(key string) (*dns.Msg, error) {
 }
 
 func (c *MemoryCache) Set(key string, msg *dns.Msg, ttl time.Duration) error {
+	if ttl == 0 {
+		return nil
+	}
+
 	if c.Full() && !c.Exists(key) {
 		return CacheIsFull{}
 	}
 
-	if ttl == 0 {
-		ttl = c.DefaultTtl
+	if ttl != 0 && ttl < c.MinTtl {
+		ttl = c.MinTtl
 	}
 
 	record := DomainRecord{

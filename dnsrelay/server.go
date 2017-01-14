@@ -47,9 +47,9 @@ func NewDNSServer(config *Config, customDnsServer bool) (ds *DNSServer, err erro
 	switch config.DNSCache.Backend {
 	case "memory":
 		cache = MemoryCache{
-			Backend:  make(map[string]DomainRecord, config.DNSCache.Maxcount),
-			DefaultTtl:   time.Duration(config.DNSCache.Expire),
-			Maxcount: config.DNSCache.Maxcount,
+			Backend:  make(map[string]DomainRecord, config.DNSCache.MaxCount),
+			MinTtl:   time.Duration(config.DNSCache.MinExpire),
+			Maxcount: config.DNSCache.MaxCount,
 		}
 		cache.Serve()
 	default:
@@ -117,9 +117,11 @@ func (ds *DNSServer) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			newResp.Id = req.Id
 			resp = &newResp
 			hitCache = true
-		} else if newResp, ok := ds.config.Hosts.Get(req); ok {
+		} else if cacheResp, ok := ds.config.Hosts.Get(req); ok {
 			ds.logger.Debugf("%s found in hosts file", question.Name)
-			resp = newResp
+			newResp := *cacheResp
+			newResp.Id = req.Id
+			resp = &newResp
 		}
 	}
 
@@ -145,10 +147,12 @@ func (ds *DNSServer) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			if hitCache == true {
 				ds.logger.Debugf("No need to insert %s into cache", question.Name)
 
-			} else if err := ds.cache.Set(question.Name, resp, time.Duration(resp.Answer[0].Header().Ttl)); err != nil {
-				ds.logger.Warningf("Set %s cache failed: %s", question.Name, err.Error())
 			} else {
-				ds.logger.Debugf("Insert %s into cache", question.Name)
+				if err := ds.cache.Set(question.Name, resp, time.Duration(resp.Answer[0].Header().Ttl)); err != nil {
+					ds.logger.Warningf("Set %s cache failed: %s", question.Name, err.Error())
+				} else {
+					ds.logger.Debugf("Insert %s into cache", question.Name)
+				}
 			}
 		}
 	} else {
