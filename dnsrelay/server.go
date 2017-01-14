@@ -199,16 +199,23 @@ func (ds *DNSServer) sendRequest(req *dns.Msg, dnsgroups []string) (resp *dns.Ms
 			continue
 		}
 
-		switch result.Response.Answer[0].(type) {
-		case *dns.A:
-			aRecord, _ := result.Response.Answer[0].(*dns.A)
-			resultIp := aRecord.A
+		isThisResultOk := true
+		ScanResponse: for _, as := range result.Response.Answer {
+			switch as.(type) {
+			case *dns.A:
+				aRecord, _ := result.Response.Answer[0].(*dns.A)
+				resultIp := aRecord.A
 
-			if ds.isIpOK(result.Group, resultIp) {
-				resp = result.Response
-				break WaitingDNSResponse
+				if !ds.isIpOK(result.Group, resultIp) {
+					isThisResultOk = false
+					break ScanResponse
+				}
+			default:
+				continue ScanResponse
 			}
-		default:
+		}
+
+		if isThisResultOk {
 			resp = result.Response
 			break WaitingDNSResponse
 		}
@@ -232,11 +239,7 @@ func (ds *DNSServer) isIpOK(dnsGroup string, resultIp net.IP) bool {
 
 	if err != nil {
 		ds.logger.Errorf("cant reconize the localtion of ip:%s", resultIp.String())
-		if dnsGroup != rule.CN_GROUP {
-			return true
-		} else {
-			return false
-		}
+		isCN = false
 	}
 
 	if dnsGroup == rule.CN_GROUP  && isCN {
