@@ -255,9 +255,11 @@ func (ds *DNSServer) isIpOK(dnsGroup string, resultIp net.IP) bool {
 			ds.logger.Debugf("DNS result IP[%s] in Geo country[%s] from DNS server[%s] can be trusted!", resultIp, country.Country.IsoCode, dnsGroup)
 			return true
 		}
-	}
 
-	return false
+		return false
+	} else {
+		return true
+	}
 }
 
 func (ds *DNSServer) sendDNSRequestsAsync(req *dns.Msg, results chan <- DNSResult, dnsgroups []string) {
