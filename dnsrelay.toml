@@ -2,7 +2,7 @@
 addr=":5356"
 
 # Default action is send all queries to DEFAULT groups
-default-group = ["SYSTEM","FG"]
+default-group = ["SYSTEM","CNNS", "FG"]
 
 [GeoIPValidate]
 enable=true
