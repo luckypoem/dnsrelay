@@ -6,7 +6,7 @@ import (
 	"os/signal"
 	"syscall"
 	"log"
-	"./dnsrelay"
+	"github.com/FTwOoO/dnsrelay/dnsrelay"
 )
 
 var (
