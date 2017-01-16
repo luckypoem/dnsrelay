@@ -8,9 +8,9 @@ import (
 	"github.com/FTwOoO/vpncore/net/geoip"
 	"github.com/FTwOoO/vpncore/net/rule"
 	"github.com/FTwOoO/vpncore/net/addr"
-
 	"time"
 	"errors"
+	"github.com/athom/goset"
 )
 
 const (
@@ -42,6 +42,11 @@ func CreateNormalDnsServer(addr string) (*dns.Server, error) {
 }
 
 func NewDNSServer(config *Config, customDnsServer bool) (ds *DNSServer, err error) {
+	if config == nil {
+		config = DefaultConfig
+	} else {
+		config.DNSGroups[rule.SYSTEM_GROUP] = DefaultConfig.DNSGroups[rule.SYSTEM_GROUP]
+	}
 
 	var cache MemoryCache
 	switch config.DNSCache.Backend {
@@ -69,8 +74,8 @@ func NewDNSServer(config *Config, customDnsServer bool) (ds *DNSServer, err erro
 	}
 
 	var reader *geoip.Reader
-	if config.GeoIPDBPath != "" {
-		reader, err = geoip.Open(config.GeoIPDBPath)
+	if config.GeoIPValidate.Enable && config.GeoIPValidate.GeoIpDBPath != "" {
+		reader, err = geoip.Open(config.GeoIPValidate.GeoIpDBPath)
 		if err != nil {
 			return nil, err
 		}
@@ -200,10 +205,11 @@ func (ds *DNSServer) sendRequest(req *dns.Msg, dnsgroups []string) (resp *dns.Ms
 		}
 
 		isThisResultOk := true
+
 		ScanResponse: for _, as := range result.Response.Answer {
 			switch as.(type) {
 			case *dns.A:
-				aRecord, _ := result.Response.Answer[0].(*dns.A)
+				aRecord, _ := as.(*dns.A)
 				resultIp := aRecord.A
 
 				if !ds.isIpOK(result.Group, resultIp) {
@@ -231,23 +237,24 @@ func (ds *DNSServer) isIpOK(dnsGroup string, resultIp net.IP) bool {
 		return false
 	}
 
-	if ds.config.FuckGFW == false {
-		return true
-	}
+	if ds.config.GeoIPValidate.Enable == true {
+		country, err := ds.geoReader.Country(resultIp)
 
-	isCN, err := ds.geoReader.IsChineseIP(resultIp)
+		if err != nil {
+			ds.logger.Errorf("cant reconize the localtion of ip:%s", resultIp.String())
+			return false
+		}
 
-	if err != nil {
-		ds.logger.Errorf("cant reconize the localtion of ip:%s", resultIp.String())
-		isCN = false
-	}
+		groupMatched := goset.IsIncluded(ds.config.GeoIPValidate.Groups, dnsGroup)
+		countryMatched :=  string(ds.config.GeoIPValidate.GeoCountry) == country.Country.IsoCode
 
-	if dnsGroup == rule.CN_GROUP  && isCN {
-		ds.logger.Debugf("DNS result of CN IP[%s] from CN DNS server can be trusted!", resultIp)
-		return true
-	} else if dnsGroup != rule.CN_GROUP  && !isCN {
-		ds.logger.Debugf("DNS result of NO CN IP[%s] from NO CN DNS server can be trusted!", resultIp)
-		return true
+		if groupMatched  && countryMatched {
+			ds.logger.Debugf("DNS result IP[%s] in Geo country[%s] from DNS server[%s] can be trusted!", resultIp, country.Country.IsoCode, dnsGroup)
+			return true
+		} else if !groupMatched  && !countryMatched {
+			ds.logger.Debugf("DNS result IP[%s] in Geo country[%s] from DNS server[%s] can be trusted!", resultIp, country.Country.IsoCode, dnsGroup)
+			return true
+		}
 	}
 
 	return false

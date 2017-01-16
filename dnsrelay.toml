@@ -1,11 +1,15 @@
 
-# use along with the CN group
-fuck-gfw=true
 addr=":5356"
-geoip-mmdb-file="GeoLite2-Country.mmdb"
 
 # Default action is send all queries to DEFAULT groups
-default-group = ["CN","FG"]
+default-group = ["SYSTEM","FG"]
+
+[GeoIPValidate]
+enable=true
+groups=["CNNS", "SYSTEM"]
+geoip-country="CN"
+geoip-mmdb-file="GeoLite2-Country.mmdb"
+
 
 [Log]
 # log-file="dnsrelay.log"
@@ -30,12 +34,12 @@ net=[
 # The "REJECT" group is special that will block the domain
 #
 [DNSGroup]
-CN=["192.168.1.1", "114.114.114.114", "223.6.6.6:53", "223.5.5.5"]
+CNNS=["192.168.1.1", "114.114.114.114", "223.6.6.6:53", "223.5.5.5"]
 FG=["8.8.8.8", "8.8.4.4"]
 
 [[DomainRule]]
 scheme="DOMAIN"
-group="CN"
+group="CNNS"
 value=[
     "order.mi.com",
     "baidu.com",
