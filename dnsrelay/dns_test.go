@@ -26,13 +26,16 @@ func BenchmarkDig(b *testing.B) {
 
 }
 
-func callbackFunc(msg *dns.Msg) error {
+func callbackFunc1(ctx QueryContext, msg *dns.Msg) error {
 	ips, err := GetIPFromMsg(msg)
 	if err != nil {
 		return err
 	}
 
-	fmt.Print("result ip:", ips)
+	fmt.Printf("result ip:%v\n", ips)
+	if ctxIntValue, ok := ctx.(int); ok {
+		fmt.Printf("context:%d\n", ctxIntValue)
+	}
 	return nil
 }
 
@@ -42,6 +45,6 @@ func TestDnsServer(t *testing.T) {
 		t.Fatal(err)
 		t.Fail()
 	}
-	ds.QueryIPv4("baidu.com", callbackFunc)
+	ds.QueryIPv4("baidu.com", 1, callbackFunc1)
 
 }

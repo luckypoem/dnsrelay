@@ -98,24 +98,24 @@ func NewDNSServer(config *Config, dontServ bool) (ds *DNSServer, err error) {
 	return
 }
 
-func (d *DNSServer) QueryIPv4(host string, callback MsgHandler) {
+func (d *DNSServer) QueryIPv4(host string, ctx QueryContext, h MsgHandler) {
 	msg := new(dns.Msg)
 	msg.SetQuestion(dns.Fqdn(host), dns.TypeA)
 	msg.RecursionDesired = true
 
-	w := &sessionWriter{msgHandler:callback}
+	w := &sessionWriter{handler:h, ctx:ctx}
 	d.ServeDNS(w, msg)
 	return
 }
 
-func (d *DNSServer) QueryByDNSMsg(msg *dns.Msg, responseWriteFunc WriteHandler) {
-	w := &sessionWriter{writeFunc:responseWriteFunc}
+func (d *DNSServer) QueryByDNSMsg(msg *dns.Msg, ctx QueryContext, h Handler) {
+	w := &sessionWriter{handler:h, ctx:ctx}
 	d.ServeDNS(w, msg)
 }
 
-func (d *DNSServer) QueryByData(requestData []byte, responseWriteFunc WriteHandler) {
+func (d *DNSServer) QueryByData(requestData []byte, ctx QueryContext, h Handler) {
 
-	w := &sessionWriter{writeFunc:responseWriteFunc}
+	w := &sessionWriter{handler:h, ctx:ctx}
 
 	req := new(dns.Msg)
 	err := req.Unpack(requestData)

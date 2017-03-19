@@ -5,27 +5,29 @@ import (
 	"net"
 )
 
-type WriteHandler func(m []byte) (int, error)
-type MsgHandler func(msg *dns.Msg) error
+type QueryContext interface{}
+type Handler interface {}
+
+type WriteHandler func(ctx QueryContext, m []byte) error
+type MsgHandler   func(ctx QueryContext, msg *dns.Msg) error
 
 type sessionWriter struct {
-	writeFunc  WriteHandler
-	msgHandler MsgHandler
+	ctx        QueryContext
+	handler    Handler
 }
 
 // WriteMsg implements the ResponseWriter.WriteMsg method.
 func (w *sessionWriter) WriteMsg(m *dns.Msg) (err error) {
-	if w.writeFunc != nil {
+	if h, ok := w.handler.(WriteHandler); ok {
 		var data []byte
 		data, err = m.Pack()
 		if err != nil {
 			return err
 		}
+		return h(w.ctx, data)
 
-		_, err = w.Write(data)
-		return err
-	} else if w.msgHandler != nil {
-		return w.msgHandler(m)
+	} else if h, ok := w.handler.(MsgHandler); ok{
+		return h(w.ctx, m)
 	}
 
 	panic("SessionWriter must initial a callback")
@@ -34,16 +36,19 @@ func (w *sessionWriter) WriteMsg(m *dns.Msg) (err error) {
 
 // Write implements the ResponseWriter.Write method.
 func (w *sessionWriter) Write(data []byte) (int, error) {
-	if w.writeFunc != nil {
-		return w.writeFunc(data)
-	} else if w.msgHandler != nil {
+	length := len(data)
+
+	if h, ok := w.handler.(WriteHandler); ok  {
+		return length, h(w.ctx, data)
+
+	} else if h, ok := w.handler.(MsgHandler); ok {
 		r := new(dns.Msg)
 		err := r.Unpack(data)
 		if err != nil {
 			return 0, err
 		}
 
-		return len(data), w.msgHandler(r)
+		return length, h(w.ctx, r)
 	}
 
 	panic("SessionWriter must initial a callback")
