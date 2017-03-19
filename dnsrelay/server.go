@@ -41,7 +41,7 @@ func CreateNormalDnsServer(addr string) (*dns.Server, error) {
 	return server, nil
 }
 
-func NewDNSServer(config *Config, customDnsServer bool) (ds *DNSServer, err error) {
+func NewDNSServer(config *Config, dontServ bool) (ds *DNSServer, err error) {
 	if config == nil {
 		config = DefaultConfig
 	} else {
@@ -89,13 +89,44 @@ func NewDNSServer(config *Config, customDnsServer bool) (ds *DNSServer, err erro
 		client:     client,
 	}
 
-	if customDnsServer == false {
+	if dontServ == false {
 		inDnsServ, _ := CreateNormalDnsServer(config.Addr)
 		inDnsServ.Handler = ds
 		go inDnsServ.ListenAndServe()
 	}
 
 	return
+}
+
+func (d *DNSServer) QueryIPv4(host string, callback MsgHandler) {
+	msg := new(dns.Msg)
+	msg.SetQuestion(dns.Fqdn(host), dns.TypeA)
+	msg.RecursionDesired = true
+
+	w := &sessionWriter{msgHandler:callback}
+	d.ServeDNS(w, msg)
+	return
+}
+
+func (d *DNSServer) QueryByDNSMsg(msg *dns.Msg, responseWriteFunc WriteHandler) {
+	w := &sessionWriter{writeFunc:responseWriteFunc}
+	d.ServeDNS(w, msg)
+}
+
+func (d *DNSServer) QueryByData(requestData []byte, responseWriteFunc WriteHandler) {
+
+	w := &sessionWriter{writeFunc:responseWriteFunc}
+
+	req := new(dns.Msg)
+	err := req.Unpack(requestData)
+	if err != nil {
+		x := new(dns.Msg)
+		x.SetRcodeFormatError(req)
+		w.WriteMsg(x)
+		w.Close()
+	}
+
+	d.ServeDNS(w, req)
 }
 
 

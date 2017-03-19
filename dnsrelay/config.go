@@ -10,9 +10,40 @@ import (
 	"github.com/miekg/dns"
 	"net"
 	"strconv"
+	"errors"
+)
+
+var (
+	ErrDnsTimeOut      = errors.New("dns timeout.")
+	ErrDnsMsgIllegal   = errors.New("dns message illegal.")
+	ErrNoDnsServer     = errors.New("no proper dns server.")
 )
 
 var DefaultConfig *Config
+
+func init() {
+	dnsconf, err := dns.ClientConfigFromFile("/etc/resolv.conf")
+	var dnsAddrs = []addr.DNSAddresss{}
+
+	if err == nil {
+		systemDnsServerIp := net.ParseIP(dnsconf.Servers[0])
+		systemDnsPort, _ := strconv.ParseInt(dnsconf.Port, 10, 16)
+		addr1 := addr.DNSAddresss{Ip:systemDnsServerIp, Port:uint16(systemDnsPort)}
+		dnsAddrs = append(dnsAddrs, addr1)
+	} else {
+		dnsAddrs = append(dnsAddrs, addr.DNSAddresss{Ip:net.IP{8,8,8,8}, Port:uint16(53)})
+		dnsAddrs = append(dnsAddrs, addr.DNSAddresss{Ip:net.IP{114,114,114,114}, Port:uint16(53)})
+	}
+
+	DefaultConfig = &Config{
+		DefaultGroups:[]string{rule.SYSTEM_GROUP},
+		GeoIPValidate:GeoIPValidate{Enable:false},
+		DNSCache:DNSCache{Backend:"memory", MinExpire:60, MaxCount:500},
+		DNSGroups:map[string][]addr.DNSAddresss{rule.SYSTEM_GROUP:dnsAddrs},
+		LogConfig:LogConfig{LogLevel:logger.DEBUG},
+	}
+}
+
 
 type LogConfig  struct {
 	LogLevel logger.LogLevel `toml:"log-level"`
@@ -65,23 +96,3 @@ func NewConfig(path string) (c *Config, err error) {
 
 }
 
-func init() {
-	dnsconf, err := dns.ClientConfigFromFile("/etc/resolv.conf")
-	if err != nil {
-		panic(err)
-	}
-
-	systemDnsServerIp := net.ParseIP(dnsconf.Servers[0])
-	systemDnsPort, _ := strconv.ParseInt(dnsconf.Port, 10, 16)
-
-	DefaultConfig = &Config{
-		DefaultGroups:[]string{rule.SYSTEM_GROUP},
-		GeoIPValidate:GeoIPValidate{Enable:false},
-		DNSCache:DNSCache{Backend:"memory", MinExpire:60, MaxCount:500},
-		DNSGroups:map[string][]addr.DNSAddresss{rule.SYSTEM_GROUP:[]addr.DNSAddresss{
-			{Ip:systemDnsServerIp,
-				Port:uint16(systemDnsPort)},
-		}},
-		LogConfig:LogConfig{LogLevel:logger.DEBUG},
-	}
-}
