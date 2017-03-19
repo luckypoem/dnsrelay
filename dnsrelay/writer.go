@@ -18,16 +18,20 @@ type sessionWriter struct {
 
 // WriteMsg implements the ResponseWriter.WriteMsg method.
 func (w *sessionWriter) WriteMsg(m *dns.Msg) (err error) {
-	if h, ok := w.handler.(WriteHandler); ok {
+	h1, ok1 := w.handler.(WriteHandler)
+	h2, ok2 := w.handler.(MsgHandler)
+
+	if ok1 {
 		var data []byte
 		data, err = m.Pack()
 		if err != nil {
 			return err
 		}
-		return h(w.ctx, data)
+		return h1(w.ctx, data)
+	}
 
-	} else if h, ok := w.handler.(MsgHandler); ok{
-		return h(w.ctx, m)
+	if ok2 {
+		return h2(w.ctx, m)
 	}
 
 	panic("SessionWriter must initial a callback")
@@ -40,8 +44,9 @@ func (w *sessionWriter) Write(data []byte) (int, error) {
 
 	if h, ok := w.handler.(WriteHandler); ok  {
 		return length, h(w.ctx, data)
+	}
 
-	} else if h, ok := w.handler.(MsgHandler); ok {
+	if h, ok := w.handler.(MsgHandler); ok {
 		r := new(dns.Msg)
 		err := r.Unpack(data)
 		if err != nil {
