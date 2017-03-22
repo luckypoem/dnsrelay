@@ -54,8 +54,8 @@ func (c *Cache) Add(key string, value CacheItem) {
 	c.n += value.GetCapacity()
 
 	for {
-		if c.Capacity() > c.MaxCacity {
-			c.removeOldest()
+		if c.n > c.MaxCacity {
+			c.lru.RemoveOldest()
 		} else {
 			break
 		}
@@ -82,15 +82,6 @@ func (c *Cache) Remove(key string) {
 	defer c.mu.Unlock()
 
 	c.lru.Remove(key)
-}
-
-
-func (c *Cache) removeOldest() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.lru != nil {
-		c.lru.RemoveOldest()
-	}
 }
 
 func (c *Cache) Capacity() int64 {

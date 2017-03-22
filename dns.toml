@@ -1,5 +1,5 @@
 
-addr=":5353"
+addr="0.0.0.0:15353"
 
 # Default action is send all queries to DEFAULT groups
 default-group = ["SYSTEM","CNNS", "FG"]

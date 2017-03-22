@@ -83,7 +83,10 @@ func NewDNSServer(config *Config, dontServ bool) (ds *DNSServer, err error) {
 	if dontServ == false {
 		inDnsServ, _ := createNormalDnsServer(config.Addr)
 		inDnsServ.Handler = ds
-		go inDnsServ.ListenAndServe()
+		go func() {
+			err = inDnsServ.ListenAndServe()
+			panic(err)
+		}()
 	}
 
 	return
@@ -172,11 +175,11 @@ func (ds *DNSServer) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			(question.Qtype == dns.TypeA || question.Qtype == dns.TypeAAAA) &&
 			len(resp.Answer) > 0 {
 
-			if hitCache == true {
-				ds.logger.Debugf("No need to insert %s into cache", question.Name)
+			if hitCache == false {
+				ttl := time.Duration(resp.Answer[0].Header().Ttl)
+				ds.logger.Debugf("Insert %s into cache with ttl:%d", question.Name, ttl)
+				ds.cache.Add(question.Name, resp, ttl)
 
-			} else {
-				ds.cache.Add(question.Name, resp, time.Duration(resp.Answer[0].Header().Ttl))
 			}
 		}
 	}
