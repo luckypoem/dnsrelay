@@ -6,11 +6,11 @@ import (
 	"os/signal"
 	"syscall"
 	"log"
-	"github.com/FTwOoO/dnsrelay/dnsrelay"
+	"github.com/FTwOoO/dnsrelay/dns"
 )
 
 var (
-	config_path = flag.String("config", "dnsrelay.toml", "Config file")
+	config_path = flag.String("config", "dns.toml", "Config file")
 )
 
 func main() {
@@ -21,12 +21,12 @@ func main() {
 		panic("Arguments missing")
 	}
 
-	config, err := dnsrelay.NewConfig(*config_path)
+	config, err := dns.NewConfig(*config_path)
 	if err != nil {
 		panic(err)
 	}
 
-	_, err = dnsrelay.NewDNSServer(config, false)
+	_, err = dns.NewDNSServer(config, false)
 	if err != nil {
 		panic(err)
 	}

@@ -1,10 +1,10 @@
-package dnsrelay
+package dns
 
 import (
-	"testing"
-
 	"github.com/miekg/dns"
+	"testing"
 	"fmt"
+	"net"
 )
 
 const (
@@ -26,8 +26,21 @@ func BenchmarkDig(b *testing.B) {
 
 }
 
+func getIPFromMsg(r *dns.Msg) (addrs []net.IP, err error) {
+	for _, a := range r.Answer {
+		switch ta := a.(type) {
+		case *dns.A:
+			addrs = append(addrs, ta.A)
+		case *dns.AAAA:
+			addrs = append(addrs, ta.AAAA)
+		}
+	}
+
+	return
+}
+
 func callbackFunc1(ctx QueryContext, msg *dns.Msg) error {
-	ips, err := GetIPFromMsg(msg)
+	ips, err := getIPFromMsg(msg)
 	if err != nil {
 		return err
 	}

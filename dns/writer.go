@@ -1,4 +1,4 @@
-package dnsrelay
+package dns
 
 import (
 	"github.com/miekg/dns"
@@ -8,7 +8,7 @@ import (
 type QueryContext interface{}
 type Handler interface {}
 
-type WriteHandler func(ctx QueryContext, m []byte) error
+type RawHandler func(ctx QueryContext, m []byte) error
 type MsgHandler   func(ctx QueryContext, msg *dns.Msg) error
 
 type sessionWriter struct {
@@ -18,7 +18,7 @@ type sessionWriter struct {
 
 // WriteMsg implements the ResponseWriter.WriteMsg method.
 func (w *sessionWriter) WriteMsg(m *dns.Msg) (err error) {
-	h1, ok1 := w.handler.(WriteHandler)
+	h1, ok1 := w.handler.(RawHandler)
 	h2, ok2 := w.handler.(MsgHandler)
 
 	if ok1 {
@@ -42,7 +42,7 @@ func (w *sessionWriter) WriteMsg(m *dns.Msg) (err error) {
 func (w *sessionWriter) Write(data []byte) (int, error) {
 	length := len(data)
 
-	if h, ok := w.handler.(WriteHandler); ok  {
+	if h, ok := w.handler.(RawHandler); ok  {
 		return length, h(w.ctx, data)
 	}
 

@@ -1,4 +1,4 @@
-package dnsrelay
+package dns
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 
 func TestNewConfig(t *testing.T) {
 
-	config, err := NewConfig("../dnsrelay.toml")
+	config, err := NewConfig("../dns.toml")
 	if err != nil {
 		t.Fatal(err)
 	}

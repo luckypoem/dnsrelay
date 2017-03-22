@@ -1,16 +1,15 @@
-package dnsrelay
+package dns
 
 import (
-	"net"
-	"sync"
+	"github.com/athom/goset"
 	"github.com/miekg/dns"
 	"github.com/FTwOoO/go-logger"
 	"github.com/FTwOoO/vpncore/net/geoip"
 	"github.com/FTwOoO/vpncore/net/rule"
 	"github.com/FTwOoO/vpncore/net/addr"
 	"time"
-	"errors"
-	"github.com/athom/goset"
+	"net"
+	"sync"
 )
 
 const (
@@ -25,11 +24,11 @@ type DNSServer struct {
 	config    *Config
 	geoReader *geoip.Reader
 	logger    *logger.Logger
-	cache     *MemoryCache
+	cache     *DnsCache
 	client    *dns.Client
 }
 
-func CreateNormalDnsServer(addr string) (*dns.Server, error) {
+func createNormalDnsServer(addr string) (*dns.Server, error) {
 	server := &dns.Server{
 		Net:          "udp",
 		Addr:         addr,
@@ -48,17 +47,9 @@ func NewDNSServer(config *Config, dontServ bool) (ds *DNSServer, err error) {
 		config.DNSGroups[rule.SYSTEM_GROUP] = DefaultConfig.DNSGroups[rule.SYSTEM_GROUP]
 	}
 
-	var cache MemoryCache
-	switch config.DNSCache.Backend {
-	case "memory":
-		cache = MemoryCache{
-			Backend:  make(map[string]DomainRecord, config.DNSCache.MaxCount),
-			MinTtl:   time.Duration(config.DNSCache.MinExpire),
-			Maxcount: config.DNSCache.MaxCount,
-		}
-		cache.Serve()
-	default:
-		return nil, errors.New("Cache backend dont support!")
+	var cache *DnsCache
+	if config.DNSCache.Enable {
+		cache = NewDnsCache(config.DNSCache.MaxCount)
 	}
 
 	client := &dns.Client{
@@ -85,12 +76,12 @@ func NewDNSServer(config *Config, dontServ bool) (ds *DNSServer, err error) {
 		config:     config,
 		geoReader:  reader,
 		logger:     mlogger,
-		cache:      &cache,
+		cache:      cache,
 		client:     client,
 	}
 
 	if dontServ == false {
-		inDnsServ, _ := CreateNormalDnsServer(config.Addr)
+		inDnsServ, _ := createNormalDnsServer(config.Addr)
 		inDnsServ.Handler = ds
 		go inDnsServ.ListenAndServe()
 	}
@@ -143,10 +134,10 @@ func (ds *DNSServer) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	hitCache := false
 
 	question := req.Question[0]
-	if question.Qclass == dns.ClassINET &&
+	if ds.cache != nil && question.Qclass == dns.ClassINET &&
 		(question.Qtype == dns.TypeA || question.Qtype == dns.TypeAAAA) {
 
-		if cacheResp, err := ds.cache.Get(question.Name); err == nil {
+		if cacheResp, ok := ds.cache.Get(question.Name); ok {
 			ds.logger.Debugf("%s hit cache", question.Name)
 			// dont change cache object, copy it
 			newResp := *cacheResp
@@ -165,7 +156,8 @@ func (ds *DNSServer) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		group := ds.config.DomainRules.FindGroup(question.Name)
 		if group == rule.REJECT_GROUP {
 			ds.logger.Debugf("Reject %s!", question.Name)
-			resp = nil
+			dns.HandleFailed(w, req)
+			return
 		} else if group != "" {
 			resp = ds.sendRequest(req, []string{group})
 		} else {
@@ -184,15 +176,9 @@ func (ds *DNSServer) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 				ds.logger.Debugf("No need to insert %s into cache", question.Name)
 
 			} else {
-				if err := ds.cache.Set(question.Name, resp, time.Duration(resp.Answer[0].Header().Ttl)); err != nil {
-					ds.logger.Warningf("Set %s cache failed: %s", question.Name, err.Error())
-				} else {
-					ds.logger.Debugf("Insert %s into cache", question.Name)
-				}
+				ds.cache.Add(question.Name, resp, time.Duration(resp.Answer[0].Header().Ttl))
 			}
 		}
-	} else {
-		dns.HandleFailed(w, req)
 	}
 }
 
@@ -263,7 +249,7 @@ func (ds *DNSServer) sendRequest(req *dns.Msg, dnsgroups []string) (resp *dns.Ms
 }
 
 func (ds *DNSServer) isIpOK(dnsGroup string, resultIp net.IP) bool {
-	if ds.config.IPFilter.FindIP(resultIp) {
+	if ds.config.IPBlocker.FindIP(resultIp) {
 		ds.logger.Infof("block ip %v", resultIp.String())
 		return false
 	}
@@ -277,7 +263,7 @@ func (ds *DNSServer) isIpOK(dnsGroup string, resultIp net.IP) bool {
 		}
 
 		groupMatched := goset.IsIncluded(ds.config.GeoIPValidate.Groups, dnsGroup)
-		countryMatched :=  string(ds.config.GeoIPValidate.GeoCountry) == country.Country.IsoCode
+		countryMatched := string(ds.config.GeoIPValidate.GeoCountry) == country.Country.IsoCode
 
 		if groupMatched  && countryMatched {
 			ds.logger.Debugf("DNS result IP[%s] in Geo country[%s] from DNS server[%s] can be trusted!", resultIp, country.Country.IsoCode, dnsGroup)

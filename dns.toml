@@ -1,5 +1,5 @@
 
-addr=":5356"
+addr=":5353"
 
 # Default action is send all queries to DEFAULT groups
 default-group = ["SYSTEM","CNNS", "FG"]
@@ -12,15 +12,14 @@ geoip-mmdb-file="GeoLite2-Country.mmdb"
 
 
 [Log]
-# log-file="dnsrelay.log"
+# log-file="dns.log"
 log-level="DEBUG"
 
 [Cache]
-backend = "memory"
-min-expire = 60
+enable =true
 max-count = 500
 
-[IPFilter]
+[IPBlocker]
 ip=[
    "64.111.96.204"
    ]
