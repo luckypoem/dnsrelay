@@ -2,7 +2,7 @@ package dns
 
 import (
 	"github.com/naoina/toml"
-	"github.com/FTwOoO/go-logger"
+	"github.com/apsdehal/go-logger"
 	"github.com/FTwOoO/vpncore/net/rule"
 	"github.com/FTwOoO/vpncore/net/addr"
 	"github.com/miekg/dns"
